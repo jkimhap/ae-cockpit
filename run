@@ -1,0 +1,8 @@
+#!/bin/bash
+# Launch the AE Cockpit. Usage:  ./run            (Grant)
+#                                COCKPIT_REP=derek ./run
+#                                COCKPIT_PORT=8790 ./run
+cd "$(dirname "$0")" || exit 1
+PY="../quinn-os/.venv/bin/python3"
+[ -x "$PY" ] || PY="python3"
+exec "$PY" serve.py "$@"
