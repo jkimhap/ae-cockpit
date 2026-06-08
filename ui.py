@@ -1,5 +1,5 @@
-"""ui.py — the cockpit SPA. Single main page (deals grouped by stage) + a deal view that
-is a stage-by-stage RUBRIC (capture + notes) with a built-in ROI calculator. Served by serve.py."""
+"""ui.py — the cockpit SPA. Stage-aware deal view with talk-track prompts,
+live ROI calculator, and BANT qualification scoring. Served by serve.py."""
 
 def html(rep):
     return TEMPLATE.replace("__REP__", rep)
@@ -91,6 +91,10 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .ritem .ai-src{font-size:10px;color:var(--accent-ink);font-weight:700}
 .ritem .rh{font-size:11.5px;color:var(--faint);margin-top:2px;line-height:1.4}
 .ritem .rin{margin-top:8px}
+/* Talk-track prompt */
+.ritem .prompt{margin-top:6px;padding:7px 10px;background:var(--accent-soft);border-radius:7px;font-size:12px;color:var(--accent-ink);line-height:1.45;font-style:italic;border-left:2px solid var(--accent-ink);cursor:pointer;position:relative}
+.ritem .prompt::before{content:"SAY";font-size:9px;font-weight:700;letter-spacing:.05em;font-style:normal;position:absolute;top:-8px;left:8px;background:var(--accent-soft);padding:0 4px;color:var(--accent-ink);opacity:.7}
+.ritem .prompt:hover{background:var(--demo-bg)}
 .rin input,.rin select,.rin textarea{width:100%;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;outline:none;background:var(--panel)}
 .rin input:focus,.rin select:focus,.rin textarea:focus{border-color:var(--accent)}
 .rin textarea{resize:vertical;min-height:38px;line-height:1.45}
@@ -102,17 +106,30 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .ai-sug .acts{display:flex;gap:7px;margin-top:8px;align-items:center}.ai-sug button{font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:6px}.ai-sug .ok{background:var(--ink);color:#fff}.ai-sug .no{color:var(--muted)}.ai-sug .cite{margin-left:auto;font-size:10.5px}
 .snotes{margin-top:14px}.snotes label{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
 .snotes textarea{width:100%;border:1px solid var(--line2);border-radius:9px;padding:9px 11px;font-size:12.5px;resize:vertical;min-height:54px;margin-top:6px;outline:none}.snotes textarea:focus{border-color:var(--accent)}
+/* BANT Score */
+.bant{margin-top:14px;background:var(--disc-bg);border:1px solid var(--disc);border-radius:10px;padding:16px 17px}
+.bant h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--disc);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.bant h4 .score{font-size:20px;letter-spacing:-0.02em}
+.bant-row{display:grid;grid-template-columns:70px 1fr 36px;align-items:center;gap:8px;padding:5px 0}
+.bant-row .lab{font-size:11.5px;font-weight:500;color:var(--muted)}
+.bant-row .track{height:7px;background:rgba(110,89,192,.15);border-radius:4px;overflow:hidden}
+.bant-row .track i{display:block;height:100%;border-radius:4px;background:var(--disc);transition:.3s}
+.bant-row .bv{font-size:12px;font-weight:600;color:var(--disc);text-align:right;font-variant-numeric:tabular-nums}
+.bant .threshold{margin-top:10px;padding-top:10px;border-top:1px solid rgba(110,89,192,.2);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.bant .threshold .status{font-weight:700;font-size:12px}.bant .threshold .status.pass{color:var(--green)}.bant .threshold .status.fail{color:var(--red)}
 /* ROI calc */
-.roi{margin-top:14px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:16px 17px}
-.roi h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px}
-.roi .rsub{font-size:11.5px;color:var(--faint);margin-bottom:13px;line-height:1.45}
-.roi-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.roi-in{display:flex;flex-direction:column;gap:3px}.roi-in label{font-size:10.5px;color:var(--muted)}
-.roi-in input{background:#fff;border:1px solid var(--line2);border-radius:7px;padding:7px 9px;color:var(--ink);font-size:12.5px;outline:none}.roi-in input:focus{border-color:var(--accent-ink)}
-.roi-out{margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;border-top:1px solid var(--line2);padding-top:13px}
-.roi-out .o .v{font-size:20px;font-weight:600;letter-spacing:-0.02em;color:var(--ink)}.roi-out .o .l{font-size:10px;color:var(--faint);margin-top:2px;line-height:1.3}
-.roi-tot{margin-top:13px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line2);padding-top:13px}.roi-tot .big{font-size:23px;font-weight:600;color:var(--ink);letter-spacing:-0.02em}.roi-tot .x{font-size:12.5px;color:var(--muted)}
-.roi-cp{margin-top:12px;font-size:11.5px;font-weight:600;color:#fff;background:var(--ink);padding:7px 13px;border-radius:8px}
+.roi{margin-top:14px;background:linear-gradient(135deg,#f8fffe,#f3f8fc);border:1px solid var(--demo);border-radius:10px;padding:18px 17px}
+.roi h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--demo);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.roi h4 .live{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.roi .rsub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.45}
+.roi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.roi-in{display:flex;flex-direction:column;gap:3px}.roi-in label{font-size:10.5px;font-weight:500;color:var(--muted)}
+.roi-in input{background:#fff;border:1px solid var(--line2);border-radius:7px;padding:8px 10px;color:var(--ink);font-size:13px;outline:none;font-weight:500}.roi-in input:focus{border-color:var(--demo);box-shadow:0 0 0 2px rgba(47,111,143,.1)}
+.roi-out{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;border-top:1px solid rgba(47,111,143,.15);padding-top:14px}
+.roi-out .o{text-align:center}.roi-out .o .v{font-size:20px;font-weight:700;letter-spacing:-0.02em;color:var(--ink)}.roi-out .o .l{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.3}
+.roi-tot{margin-top:14px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-top:1px solid rgba(47,111,143,.15);padding-top:14px}.roi-tot .big{font-size:26px;font-weight:700;color:var(--demo);letter-spacing:-0.02em}.roi-tot .x{font-size:12.5px;color:var(--muted)}
+.roi-cp{margin-top:12px;font-size:11.5px;font-weight:600;color:#fff;background:var(--demo);padding:8px 15px;border-radius:8px}.roi-cp:hover{opacity:.9}
+/* Side panels */
 .bars{display:flex;flex-direction:column;gap:8px}.barrow{display:grid;grid-template-columns:92px 1fr 24px;align-items:center;gap:9px;font-size:12px}.barrow .bl{color:var(--muted)}.barrow .bv{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)}
 .track{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}.track i{display:block;height:100%;border-radius:4px;background:var(--accent)}
 .rationale{font-size:12px;color:var(--muted);line-height:1.5;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
@@ -135,6 +152,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 18px;border-radius:10px;box-shadow:var(--shadow);z-index:120;opacity:0;transition:.2s;pointer-events:none}.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--faint);gap:10px}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}@keyframes sp{to{transform:rotate(360deg)}}
+.hide{display:none!important}
 </style></head>
 <body>
 <header class="topbar">
@@ -148,7 +166,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 <div class="pop" id="pop"></div>
 <button class="kbfab" onclick="openKB()">Playbook</button>
 <div class="scrim" id="scrim" onclick="closeKB()"></div>
-<aside class="drawer" id="drawer"><div class="dh"><b>✦ Playbook & KB</b><button class="lk" style="margin-left:auto" onclick="closeKB()">Close</button></div>
+<aside class="drawer" id="drawer"><div class="dh"><b>Playbook & KB</b><button class="lk" style="margin-left:auto" onclick="closeKB()">Close</button></div>
   <div class="tabs" id="kbTabs"></div><div class="body md" id="kbBody"></div></aside>
 <div class="toast" id="toast"></div>
 <script>
@@ -164,8 +182,8 @@ const openDeals=()=>D.deals.filter(d=>d.is_open);
 const LS={k:id=>'cockpit:'+REP+':'+id,get(id){try{return JSON.parse(localStorage.getItem(this.k(id)))||{}}catch(e){return {}}},set(id,v){localStorage.setItem(this.k(id),JSON.stringify(v))}};
 function dst(id){const s=LS.get(id);s.cap=s.cap||{};s.src=s.src||{};s.dis=s.dis||{};s.notes=s.notes||{};s.roi=s.roi||{};return s;}
 function save(id,s){LS.set(id,s);}
-const rubricById={}; // filled on load
-async function fetchJSON(u,o){const r=await fetch(u,o);return r.json();}
+const rubricById={};
+async function fetchJSON(u,o){const url=new URL(u,location.origin);const r=await fetch(url.href,o);return r.json();}
 async function load(){try{D=await fetchJSON('/api/data?rep='+REP);D.rubric.forEach(s=>s.items.forEach(it=>rubricById[it.id]=it));hydrate();route();}catch(e){$('#view').innerHTML='<div class="empty">Failed to load: '+esc(e.message)+'</div>';}}
 let refreshing=false;
 async function refresh(full,silent){if(refreshing)return;refreshing=true;$('#rbtn').disabled=true;$('#rfull').disabled=true;const o=$('#rbtn').textContent;$('#rbtn').textContent=full?'Full syncing…':'Refreshing…';
@@ -221,9 +239,7 @@ function renderMain(){
     <div class="grp"><div class="grp-h"><span class="nm">Funnel</span><span class="ct">${filterStage?'<a class="lk" onclick="toggleFunnel(null)">Clear filter</a>':'Click a stage to filter'}</span></div><div class="funnel">${funnelTiles()}</div></div>
     ${body}`;
 }
-</script>
-<style>.hide{display:none!important}</style>
-<script>
+
 /* ---------- deal view ---------- */
 let openStages={};
 function renderDeal(id){
@@ -245,6 +261,7 @@ function stageSection(d,s,i){
   const open=!!openStages[d.id][s.key];const cur=s.key===d.rubric_stage;const pr=stageProg(d,s);
   const done=pr.gates>0&&pr.gmet===pr.gates;
   const items=s.items.map(it=>ritem(d,it)).join('');
+  const bant=s.key==='disc'?bantPanel(d):'';
   const roi=s.key==='roi'?roiCalc(d):'';
   const notes=`<div class="snotes"><label>Notes — ${esc(s.name)}</label><textarea placeholder="Capture anything for this stage…" oninput="setNote('${d.id}','${s.key}',this.value)">${esc(dst(d.id).notes[s.key]||'')}</textarea></div>`;
   return `<div class="stage ${open?'open':''} ${cur?'cur':''} ${done?'done':''}">
@@ -253,7 +270,7 @@ function stageSection(d,s,i){
       <div class="stage-tt"><div class="nm">${esc(s.name)}${cur?' <span class="cur-tag">Current</span>':''}</div><div class="bl">${esc(s.blurb)}</div></div>
       <div class="stage-prog"><div class="n">${pr.cap}/${pr.tot} captured${pr.gates?` · gates ${pr.gmet}/${pr.gates}`:''}</div><div class="pbar"><i style="width:${Math.round(pr.cap/pr.tot*100)}%"></i></div></div>
       <div class="caret">▸</div></div>
-    <div class="stage-body">${items}${roi}${notes}</div></div>`;
+    <div class="stage-body">${items}${bant}${roi}${notes}</div></div>`;
 }
 function ritem(d,it){
   const val=capVal(d.id,it.id);const cap=val!=='';const src=dst(d.id).src[it.id];
@@ -263,41 +280,72 @@ function ritem(d,it){
   else if(it.type==='enum'){input=`<select onchange="setCap('${d.id}','${it.id}',this.value)"><option value="">—</option>${it.options.map(o=>`<option ${val===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;}
   else if(it.type==='text'){input=`<textarea rows="2" placeholder="Capture…" oninput="setCapDebounced('${d.id}','${it.id}',this.value)">${esc(val)}</textarea>`;}
   else{input=`<input type="number" placeholder="${it.type==='money'?'$ amount':'number'}" value="${esc(val)}" oninput="setCapDebounced('${d.id}','${it.id}',this.value)">`;}
+  const promptHTML=it.prompt?`<div class="prompt" onclick="copyPrompt(this)" title="Click to copy">"${esc(it.prompt)}"</div>`:'';
   let aiB='';
   if(ai&&!cap&&!dis){aiB=`<div class="ai-sug"><div class="hd">AI suggestion</div><div class="vv">${esc(ai.value)}</div>${ai.evidence?`<div class="ev">${esc(ai.evidence)}</div>`:''}
     <div class="acts"><button class="ok" onclick="acceptField('${d.id}','${it.id}')">Accept</button><button class="no" onclick="dismissField('${d.id}','${it.id}')">Dismiss</button>${ai.cite&&ai.cite.gid?`<a class="lk cite" onclick="showCall('${d.id}','${ai.cite.gid}',event)">${esc(ai.cite.label)}</a>`:''}</div></div>`;}
   return `<div class="ritem ${cap?'cap':''}"><div class="rl">${it.gate?'<span class="gate"></span>':''}${esc(it.label)}${cap&&src==='ai'?' <span class="ai-src">AI</span>':''}</div>
-    <div class="rh">${esc(it.hint)}</div><div class="rin">${input}</div>${aiB}</div>`;
+    <div class="rh">${esc(it.hint)}</div>${promptHTML}<div class="rin">${input}</div>${aiB}</div>`;
 }
+function copyPrompt(el){navigator.clipboard&&navigator.clipboard.writeText(el.textContent.replace(/^"|"$/g,''));toast('Question copied');}
 function toggleStage(id,k){openStages[id][k]=!openStages[id][k];renderDeal(id);}
 const _t={};
-function setCapDebounced(id,iid,v){clearTimeout(_t[iid]);_t[iid]=setTimeout(()=>{const s=dst(id);s.cap[iid]=v;s.src[iid]='ae';save(id,s);},400);}
+function setCapDebounced(id,iid,v){clearTimeout(_t[iid]);_t[iid]=setTimeout(()=>{const s=dst(id);s.cap[iid]=v;s.src[iid]='ae';save(id,s);updateBant(id);},400);}
 function setCap(id,iid,v){const s=dst(id);if(it_isyn(iid)&&s.cap[iid]===v)v='';s.cap[iid]=v;s.src[iid]='ae';save(id,s);renderDeal(id);}
 function it_isyn(iid){return (rubricById[iid]||{}).type==='yesno';}
 function acceptField(id,iid){const s=dst(id);s.cap[iid]=dealById(id).ai_fields[iid].value;s.src[iid]='ai';save(id,s);renderDeal(id);}
 function dismissField(id,iid){const s=dst(id);s.dis[iid]=true;save(id,s);renderDeal(id);}
 function setNote(id,k,v){const s=dst(id);s.notes[k]=v;save(id,s);}
-/* ---------- ROI calculator ---------- */
-const ROI_IN=[['techs','Field techs'],['hires','New hires / yr'],['weeks','Weeks-to-solo saved'],['vweek','$ value / tech-week'],['saved','Accounts saved / yr'],['acct','Avg account $/yr'],['grow','Accounts grown by advisor'],['exp','Expansion %']];
-function roiDefaults(d){return {techs:d.employees||'',hires:'',weeks:2,vweek:2000,saved:'',acct:35000,grow:'',exp:50};}
+
+/* ---------- BANT Qualification Score ---------- */
+const BANT_FIELDS=[{id:'d_bant_b',label:'Budget',max:20},{id:'d_bant_a',label:'Authority',max:20},{id:'d_bant_n',label:'Need',max:40},{id:'d_bant_t',label:'Timeline',max:20}];
+function bantScore(id){let total=0,filled=0;BANT_FIELDS.forEach(f=>{const v=parseFloat(capVal(id,f.id));if(!isNaN(v)&&v>0){total+=v;filled++;}});return {total,filled,max:100};}
+function updateBant(id){const el=document.getElementById('bant-'+id);if(el){const d=dealById(id);if(d)el.outerHTML=bantPanel(d);}}
+function bantPanel(d){
+  const bs=bantScore(d.id);
+  const rows=BANT_FIELDS.map(f=>{const v=parseFloat(capVal(d.id,f.id))||0;const pct=Math.round(v/f.max*100);
+    return `<div class="bant-row"><div class="lab">${f.label}</div><div class="track"><i style="width:${pct}%"></i></div><div class="bv">${v}/${f.max}</div></div>`;}).join('');
+  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');const statusTxt=bs.filled===0?'Score BANT fields above':pass?'QUALIFIED':'BELOW THRESHOLD';
+  return `<div class="bant" id="bant-${d.id}"><h4>BANT Qualification<span class="score">${bs.filled?bs.total+'/100':'—'}</span></h4>${rows}
+    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div></div>`;
+}
+
+/* ---------- ROI Calculator ---------- */
+const ROI_IN=[
+  ['techs','Field techs in scope','How many techs will use Quinn?'],
+  ['hourly','Avg hourly cost ($)','Fully loaded cost per tech hour'],
+  ['ramp_curr','Current ramp (weeks)','Weeks to full productivity today'],
+  ['ramp_new','New ramp w/ Quinn (weeks)','Target ramp with Quinn training'],
+  ['hires','New hires per year','Annual hiring volume'],
+  ['callback','Callback/rework rate (%)','% of jobs requiring callbacks today'],
+  ['callback_cost','Cost per callback ($)','Avg cost of each callback/rework'],
+  ['turnover','Annual turnover (%)','% of field team leaving per year'],
+  ['replace_cost','Cost to replace ($)','Hiring + ramp cost per replacement'],
+];
+function roiDefaults(d){return {techs:d.employees||'',hourly:45,ramp_curr:4,ramp_new:2,hires:'',callback:15,callback_cost:350,turnover:25,replace_cost:8000};}
 function roiVal(d,k){const s=dst(d.id);const dv=roiDefaults(d);return s.roi[k]!=null&&s.roi[k]!==''?s.roi[k]:(dv[k]!==''?dv[k]:'');}
 function setRoi(d,k,v){const s=dst(d.id);s.roi[k]=v;save(d.id,s);roiRender(d);}
 function roiCompute(d){const g=k=>parseFloat(roiVal(d,k))||0;
-  const prod=g('hires')*g('weeks')*g('vweek');const rev=g('saved')*g('acct');const grow=g('grow')*g('acct')*(g('exp')/100);
-  const tot=prod+rev+grow;const price=d.amount||0;const mult=price?tot/price:0;const pay=tot?price/(tot/12):0;
-  return {prod,rev,grow,tot,mult,pay,price};}
-function roiCalc(d){const ins=ROI_IN.map(([k,l])=>`<div class="roi-in"><label>${l}</label><input type="number" value="${esc(roiVal(d,k))}" oninput="setRoiDeb('${d.id}','${k}',this.value)"></div>`).join('');
-  return `<div class="roi"><h4>ROI artifact</h4><div class="rsub">3-lever model — productivity recovered, revenue protected, accounts grown. Edit any input; this is the source of truth for the proposal.</div>
+  const rampSaved=(g('ramp_curr')-g('ramp_new'))*40*g('hourly')*g('hires');
+  const callbackSaved=g('techs')*(g('callback')/100)*g('callback_cost')*12*0.3;
+  const turnoverSaved=g('techs')*(g('turnover')/100)*g('replace_cost')*0.2;
+  const tot=rampSaved+callbackSaved+turnoverSaved;const price=d.amount||0;const mult=price?tot/price:0;const pay=tot?price/(tot/12):0;
+  return {rampSaved,callbackSaved,turnoverSaved,tot,mult,pay,price};}
+function roiCalc(d){const ins=ROI_IN.map(([k,l,h])=>`<div class="roi-in"><label title="${esc(h)}">${l}</label><input type="number" value="${esc(roiVal(d,k))}" placeholder="${h}" oninput="setRoiDeb('${d.id}','${k}',this.value)"></div>`).join('');
+  return `<div class="roi"><h4><span class="live"></span> ROI Calculator</h4><div class="rsub">Quinn's 3-lever value model: onboarding productivity, quality/callbacks, retention. Updates live as you fill in prospect answers.</div>
     <div class="roi-grid">${ins}</div><div id="roiout-${d.id}">${roiOut(d)}</div></div>`;}
 function roiOut(d){const c=roiCompute(d);
-  return `<div class="roi-out"><div class="o"><div class="v">${money(c.prod)}</div><div class="l">Productivity recovered / yr</div></div>
-    <div class="o"><div class="v">${money(c.rev)}</div><div class="l">Revenue protected / yr</div></div>
-    <div class="o"><div class="v">${money(c.grow)}</div><div class="l">Account growth / yr</div></div></div>
+  return `<div class="roi-out"><div class="o"><div class="v">${money(c.rampSaved)}</div><div class="l">Onboarding productivity / yr</div></div>
+    <div class="o"><div class="v">${money(c.callbackSaved)}</div><div class="l">Callbacks reduced / yr</div></div>
+    <div class="o"><div class="v">${money(c.turnoverSaved)}</div><div class="l">Turnover savings / yr</div></div></div>
     <div class="roi-tot"><span class="big">${money(c.tot)}/yr</span>${c.price?`<span class="x">vs ${money(c.price)} price · <b>${c.mult.toFixed(1)}× ROI</b> · ${c.pay<1?'<1':Math.round(c.pay)} mo payback</span>`:''}</div>
-    <button class="roi-cp" onclick="copyRoi('${d.id}')">Copy ROI summary</button>`;}
+    <button class="roi-cp" onclick="copyRoi('${d.id}')">Copy ROI summary</button>`;
+}
 const _rt={};function setRoiDeb(id,k,v){clearTimeout(_rt[k]);_rt[k]=setTimeout(()=>{const d=dealById(id);const s=dst(id);s.roi[k]=v;save(id,s);const el=$('#roiout-'+id);if(el)el.innerHTML=roiOut(d);},300);}
-function copyRoi(id){const d=dealById(id);const c=roiCompute(d);const t=`${d.company} — Quinn ROI\nProductivity recovered: ${money(c.prod)}/yr\nRevenue protected: ${money(c.rev)}/yr\nAccount growth: ${money(c.grow)}/yr\nTotal value: ${money(c.tot)}/yr vs ${money(c.price)} (${c.mult.toFixed(1)}× ROI, ${Math.round(c.pay)} mo payback)`;
+function roiRender(d){const el=$('#roiout-'+d.id);if(el)el.innerHTML=roiOut(d);}
+function copyRoi(id){const d=dealById(id);const c=roiCompute(d);const t=`${d.company} — Quinn ROI Summary\n\nOnboarding productivity: ${money(c.rampSaved)}/yr\nCallback reduction: ${money(c.callbackSaved)}/yr\nTurnover savings: ${money(c.turnoverSaved)}/yr\n\nTotal annual value: ${money(c.tot)}/yr\nQuinn investment: ${money(c.price)}/yr\nROI: ${c.mult.toFixed(1)}× · Payback: ${Math.round(c.pay)} months`;
   navigator.clipboard&&navigator.clipboard.writeText(t);toast('ROI summary copied');}
+
 /* ---------- side panels ---------- */
 function dcsPanel(d){const sc=d.dcs.scores||{};const dims=[['pain','Pain'],['champion','Champion'],['multi_threading','Multi-thread'],['buying_language','Buying lang.'],['objection_status','Objections']];
   const bars=dims.filter(x=>sc[x[0]]!=null).map(x=>`<div class="barrow"><div class="bl">${x[1]}</div><div class="track"><i style="width:${sc[x[0]]*10}%;background:${sc[x[0]]>=7?'var(--green)':sc[x[0]]>=4?'var(--amber)':'var(--red)'}"></i></div><div class="bv">${sc[x[0]]}</div></div>`).join('');
@@ -311,6 +359,7 @@ function activityPanel(d){const items=(d.timeline||[]).slice(0,40);const lbl={ca
   const body=items.map(it=>{const btn=it.kind==='call'?` · <a class="lk" onclick="showCall('${d.id}','${it.ref}',event)">summary</a>`:'';
     return `<div class="it"><span class="ktag">${lbl[it.kind]||'—'}</span><div><div class="ti">${esc(it.title)}</div><div class="mt">${esc(it.sub||'')}${it.sub?' · ':''}${esc(fmtDate(it.ts))}${btn}</div></div></div>`;}).join('');
   return `<div class="panel"><h3 style="cursor:pointer" onclick="this.parentNode.querySelector('.act').classList.toggle('hide');this.querySelector('.tg').textContent=this.querySelector('.tg').textContent==='+'?'–':'+'">Activity <span class="ct"><span class="tg">+</span> ${d.calls.length} calls · ${d.emails.length} emails</span></h3><div class="act hide">${body||'<div class="empty">No activity.</div>'}</div></div>`;}
+
 /* ---------- call popover + KB ---------- */
 function showCall(did,gid,e){e.stopPropagation();const d=dealById(did);const c=d.calls.find(x=>x.gid===gid);const p=$('#pop');if(!c)return;
   p.innerHTML=`<div class="pt">${esc(c.title)}</div><div class="pm">${esc(fmtDate(c.date))}${c.duration_min?' · '+c.duration_min+' min':''} · <a class="lk" href="${c.url}" target="_blank">Open in Gong ↗</a></div>

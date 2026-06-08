@@ -84,14 +84,23 @@ def analyze_deal(deal, calls, emails, cache_dir, force=False):
         for e in emails[-8:]) or "(no emails)"
     stake_txt = "; ".join(f"{s['name']} ({s.get('title','')})" for s in deal.get("stakeholders",[])) or "unknown"
 
-    prompt = f"""You are a sharp sales analyst for Quinn (AI training platform for deskless/field-service workforces).
-Analyze ONE deal using ONLY the evidence below. Do not invent facts. If evidence is thin, leave fields out and score conservatively.
+    prompt = f"""You are a sharp sales analyst for Quinn — an AI-powered training platform for deskless/field-service workforces (HVAC, plumbing, electrical, pest control, restoration, fire protection, roofing, etc.).
+
+Quinn's value: replaces manual ride-alongs/shadowing with AI-generated courses + simulations built from the customer's own SOPs. Three ROI levers:
+1. Onboarding productivity — faster ramp time (weeks off new-hire-to-productive timeline)
+2. Quality/callbacks — fewer field errors and customer callbacks via better training
+3. Retention — reduced turnover when techs feel supported and skilled up
+
+ICP: 100–1,000 employee companies with 25+ field techs, ideally no current LMS or replacing one.
+BANT scoring: Budget(0-20) + Authority(0-20) + Need(0-40) + Timeline(0-20) = 100 total. Threshold to qualify = 50.
+
+Analyze ONE deal using ONLY the evidence below. Be AGGRESSIVE about extracting rubric fields — if a prospect mentions anything about team size, training process, pain points, tools, timeline, budget range, or decision-makers, capture it. Do not invent facts, but DO extract every signal you can find.
 
 DEAL: {deal.get('name')}
 Stage: {deal.get('stage_label')}  |  Amount: ${deal.get('amount')}  |  Company: {deal.get('company')} ({deal.get('industry','?')}, {deal.get('employees','?')} employees)
 Stakeholders seen: {stake_txt}
 
-RUBRIC — fill the `fields` you can determine from the evidence (value formatted per the item's type):
+RUBRIC — fill ALL `fields` you can determine from the evidence (value formatted per the item's type):
 {_rubric_prompt()}
 
 CALL TRANSCRIPTS (most recent first):
@@ -102,7 +111,7 @@ RECENT EMAILS:
 
 Call deal_intelligence with:
 - dcs.score 0-100 (real pain, a champion, multi-threading, buying language, objections handled) + components 0-10 + a concrete rationale.
-- fields: rubric items you can fill, each with value + evidence + cite_call_id. Be precise; skip what you can't support.
+- fields: BE THOROUGH — extract every rubric item you can support from the evidence. Include BANT scores if you can assess them. Each field needs value + evidence + cite_call_id.
 - call_summaries for EACH call (who, 3-5 discussed bullets, sentiment, next_steps).
 - next_steps: the rep's 1-3 highest-leverage actions.
 - note: one tight paragraph for the CRM.
@@ -146,14 +155,12 @@ def _heuristic(deal, calls, emails):
     fields=[]
     def f(iid,val,ev): fields.append({"item_id":iid,"value":str(val),"evidence":ev,"cite_call_id":(calls[0]["id"] if calls else None)})
     if emp:
-        band="<50" if emp<50 else "51–200" if emp<=200 else "201–1,000" if emp<=1000 else "1,000+"
+        band="<50" if emp<50 else "50–200" if emp<=200 else "201–1,000" if emp<=1000 else "1,000+"
         f("pd_size",band,f"~{emp} employees on file")
-        f("d_frontline",int(emp),f"~{emp} employees on file (estimate, confirm split)")
-    if len(stakes)>=1 and stakes[0].get("name"): f("d_owner",stakes[0]["name"]+(f" — {stakes[0]['title']}" if stakes[0].get('title') else ""),"primary contact")
-    if eb: f("d_eb",eb[0]["name"]+f" — {eb[0]['title']}","title matches economic buyer")
-    if len(stakes)>=2 and stakes[1].get("name"): f("d_stake2",stakes[1]["name"]+(f" — {stakes[1]['title']}" if stakes[1].get('title') else ""),"2nd stakeholder seen on calls")
+        f("pd_field",int(emp),f"~{emp} employees on file (estimate, confirm field split)")
+    if len(stakes)>=1 and stakes[0].get("name"): f("d_decision",stakes[0]["name"]+(f" — {stakes[0]['title']}" if stakes[0].get('title') else ""),"primary contact on calls")
     if senior: f("m_dm","yes","senior stakeholder present on calls")
-    if _hits(blob,LMS_KW): f("d_system","Has LMS — keeping","LMS/system mentioned on calls")
+    if _hits(blob,LMS_KW): f("d_tools","Has platform — keeping","LMS/platform mentioned on calls")
     summaries=[{"call_id":c["id"],"who":"; ".join(s["name"] for s in stakes[:3]) or "—","discussed":[],"sentiment":"","next_steps":[]} for c in calls[:5]]
     note=(f"{deal.get('company')} — {deal.get('stage_label')} stage, ${deal.get('amount')}. {len(stakes)} stakeholder(s)"
           f"{' incl. a decision-maker' if senior else ''}. Heuristic read: pain {pain}/10, buying {buying}/10. "
