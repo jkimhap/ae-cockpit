@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import load_env, CACHE_DIR
 load_env()
-import assemble, ui
+import assemble, ui, tasks
 
 LOCK = threading.Lock()
 PORT = int(os.environ.get("COCKPIT_PORT", "8787"))
@@ -22,7 +22,17 @@ DEFAULT_REP = os.environ.get("COCKPIT_REP", "grant")
 def cached_payload(rep):
     p = os.path.join(CACHE_DIR, f"payload-{rep}.json")
     if os.path.exists(p):
-        return json.load(open(p))
+        pl = json.load(open(p))
+        # Backfill the SalesOS Task Inbox for cached payloads written before
+        # tasks.py existed (heuristic, derived on the fly — no writes, no refetch).
+        if "inbox" not in pl:
+            try:
+                pl["inbox"] = tasks.grouped(pl)
+            except Exception:
+                pl["inbox"] = {"tasks": [], "buckets": {"overdue": [], "today": [], "upcoming": []},
+                               "counts": {"overdue": 0, "today": 0, "upcoming": 0}, "total": 0,
+                               "heuristic": True}
+        return pl
     with LOCK:
         return assemble.assemble(rep, full=True)
 

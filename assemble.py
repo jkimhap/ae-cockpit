@@ -5,7 +5,7 @@ full=False : pull HubSpot live (fast, the freshness path) and REUSE cached Gong/
 The payload shape matches ui.py's renderer.
 """
 import os, json, re, datetime
-import hubspot as hs, gong, ai, rubric
+import hubspot as hs, gong, ai, rubric, tasks
 from config import CACHE_DIR
 
 GONG_URL = "https://us-26175.app.gong.io/call?id={}"   # workspace deep-link
@@ -240,6 +240,9 @@ def assemble(rep, full=True, log=print):
                "funnel":funnel,"upcoming":up,
                "deals":sorted(deals,key=lambda x:(not x["is_open"], -(x["arr"] or 0))),
                "kb":load_kb()}
+    # SalesOS Cockpit Task Inbox — heuristically derived from this snapshot
+    # (Phase 0; not yet event-driven — see tasks.py header). Pure read; no writes.
+    payload["inbox"] = tasks.grouped(payload)
     json.dump(payload, open(_cache(f"payload-{rep}.json"),"w"), default=str)
     log(f"done: {len(deals)} deals, ai_engine={payload['ai_engine']}")
     return payload

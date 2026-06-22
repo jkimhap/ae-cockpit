@@ -7,7 +7,7 @@ def html(rep):
 TEMPLATE = r"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quinn · AE Cockpit</title>
+<title>Quinn · SalesOS Cockpit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -153,16 +153,61 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--faint);gap:10px}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}@keyframes sp{to{transform:rotate(360deg)}}
 .hide{display:none!important}
+/* ===== SalesOS two-pane shell (Phase 0) ===== */
+.shell{display:grid;grid-template-columns:380px 1fr;align-items:stretch;min-height:calc(100vh - 53px)}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.inbox{display:none}.inbox.mobile-on{display:flex}}
+.inbox{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);position:sticky;top:53px;height:calc(100vh - 53px);overflow:hidden}
+.inbox-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.inbox-h .ti{font-size:15px;font-weight:600;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px}
+.inbox-h .ti .cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--faint);background:#fff;border:1px solid var(--line2);border-radius:20px;padding:2px 9px}
+.inbox-h .note{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4;display:flex;gap:5px;align-items:flex-start}
+.inbox-h .note b{color:var(--amber);font-weight:700}
+.inbox-list{overflow-y:auto;flex:1;padding:8px 10px 24px}
+.ibgrp{margin-top:10px}.ibgrp:first-child{margin-top:4px}
+.ibgrp-h{display:flex;align-items:center;gap:7px;padding:6px 8px 5px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.ibgrp-h .dotg{width:6px;height:6px;border-radius:50%}.ibgrp-h.overdue .dotg{background:var(--red)}.ibgrp-h.today .dotg{background:var(--amber)}.ibgrp-h.upcoming .dotg{background:var(--faint)}
+.ibgrp-h .n{margin-left:auto;color:var(--faint);font-weight:600}
+.task{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin:6px 0;cursor:pointer;transition:.12s}
+.task:hover{box-shadow:var(--shadow-sm);border-color:var(--line2);transform:translateY(-1px)}
+.task.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.task .tr1{display:flex;align-items:center;gap:7px}
+.tbadge{font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.tbadge.prep{background:var(--demo-bg);color:var(--demo)}
+.tbadge.followup{background:var(--quote-bg);color:var(--quote)}
+.tbadge.gate{background:var(--disc-bg);color:var(--disc)}
+.tbadge.routing{background:var(--verbal-bg);color:var(--verbal)}
+.tbadge.multi{background:var(--won-bg);color:var(--won)}
+.tbadge.watch{background:var(--accent-soft);color:var(--accent-ink)}
+.task .co{font-weight:600;font-size:13px;letter-spacing:-0.01em;line-height:1.25;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task .why{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:6px}
+.task .tmeta{font-size:10.5px;color:var(--faint);margin-top:6px;display:flex;gap:6px;align-items:center}
+.workspace{min-width:0;overflow-x:hidden}
+.workspace .main{padding:24px 30px 90px;max-width:1180px;margin:0 auto}
+.ws-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:70vh;color:var(--faint);gap:10px;text-align:center;padding:30px}
+.ws-empty .big{font-size:15px;font-weight:600;color:var(--muted)}
+.ibtoggle{display:none}
+@media(max-width:900px){.ibtoggle{display:inline-flex}}
+.focus-flash{animation:flash 1.4s ease-out}@keyframes flash{0%{box-shadow:0 0 0 3px var(--accent-soft)}100%{box-shadow:none}}
 </style></head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="dot"></span><b>Quinn</b><span>AE Cockpit</span><span class="who" id="repName">…</span></div>
+  <div class="brand"><span class="dot"></span><b>Quinn</b><span>SalesOS Cockpit</span><span class="who" id="repName">…</span></div>
   <span class="sp"></span>
+  <button class="rfx ghost ibtoggle" onclick="$('#inbox').classList.toggle('mobile-on')" title="Toggle Task Inbox">☰ Inbox</button>
   <span class="engine none" id="engine">—</span><span class="refreshed" id="refreshed"></span>
   <button class="rfx" id="rbtn" onclick="refresh(false)">↻ Refresh</button>
   <button class="rfx ghost" id="rfull" onclick="refresh(true)" title="Re-pull Gong + regenerate AI">⟳ Full sync</button>
 </header>
-<main class="main" id="view"><div class="loading"><span class="spin"></span> Loading live HubSpot data…</div></main>
+<div class="shell">
+  <aside class="inbox" id="inbox">
+    <div class="inbox-h">
+      <div class="ti">Task Inbox <span class="cnt" id="inboxCount">—</span></div>
+      <div class="note"><b>⚠</b><span>Tasks are <b style="color:var(--amber)">derived heuristically</b> from current deal state — not yet event-driven (Phase 2).</span></div>
+    </div>
+    <div class="inbox-list" id="inboxList"><div class="empty">Loading…</div></div>
+  </aside>
+  <div class="workspace"><main class="main" id="view"><div class="loading"><span class="spin"></span> Loading live HubSpot data…</div></main></div>
+</div>
 <div class="pop" id="pop"></div>
 <button class="kbfab" onclick="openKB()">Playbook</button>
 <div class="scrim" id="scrim" onclick="closeKB()"></div>
@@ -191,10 +236,57 @@ async function refresh(full,silent){if(refreshing)return;refreshing=true;$('#rbt
   catch(e){toast('Refresh failed');}finally{refreshing=false;$('#rbtn').disabled=false;$('#rfull').disabled=false;$('#rbtn').textContent=o;}}
 function hydrate(){$('#repName').textContent=D.rep;$('#refreshed').textContent='HubSpot '+ago(D.refreshed);
   const e=$('#engine');e.className='engine '+(D.ai_engine||'none');e.innerHTML='<span class="ed"></span>'+(D.ai_engine==='claude'?'Claude':D.ai_engine==='heuristic'?'Heuristic':'No AI');
-  e.title=D.ai_engine==='heuristic'?'Anthropic key out of credits — add credits then Full sync to upgrade to Claude':'';}
+  e.title=D.ai_engine==='heuristic'?'Anthropic key out of credits — add credits then Full sync to upgrade to Claude':'';
+  renderInbox();}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2600);}
 window.addEventListener('hashchange',route);
 function route(){if(!D)return;const h=location.hash||'#/';if(h.startsWith('#/deal/'))renderDeal(h.slice(7));else renderMain();window.scrollTo(0,0);}
+
+/* ---------- LEFT PANE: SalesOS Task Inbox (Phase 0, heuristic) ----------
+   Tasks are derived server-side in tasks.py from the current deal snapshot
+   (payload.inbox). They are NOT event-driven yet — that's Phase 2. Clicking a
+   task selects its deal in the right pane and focuses the relevant section. */
+const TBADGE={'Call Prep':['prep','Prep'],'Draft Follow-up':['followup','Follow-up'],
+  'Gate-Capture':['gate','Gate'],'Routing-Check':['routing','Routing'],
+  'Multi-thread':['multi','Multi-thread'],'Watch':['watch','Watch']};
+const BUCKET_LABEL={overdue:'Overdue',today:'Today',upcoming:'Upcoming'};
+let selTask=null;          // currently selected task id
+let pendingFocus=null;     // {deal_id, section, stage} to focus after renderDeal
+function inboxData(){return (D&&D.inbox)||{buckets:{overdue:[],today:[],upcoming:[]},total:0};}
+function renderInbox(){
+  const ib=inboxData();const list=$('#inboxList');if(!list)return;
+  $('#inboxCount').textContent=ib.total||0;
+  let html='';
+  ['overdue','today','upcoming'].forEach(b=>{
+    const ts=(ib.buckets&&ib.buckets[b])||[];if(!ts.length)return;
+    html+=`<div class="ibgrp"><div class="ibgrp-h ${b}"><span class="dotg"></span>${BUCKET_LABEL[b]}<span class="n">${ts.length}</span></div>${ts.map(taskRow).join('')}</div>`;
+  });
+  list.innerHTML=html||'<div class="empty">No open tasks — inbox clear.</div>';
+}
+function taskRow(t){
+  const tb=TBADGE[t.type]||['watch',t.type];
+  return `<div class="task ${selTask===t.id?'sel':''}" onclick="selectTask('${esc(t.id)}')">
+    <div class="tr1"><span class="tbadge ${tb[0]}">${esc(tb[1])}</span><span class="co" title="${esc(t.company)}">${esc(t.company)}</span></div>
+    <div class="why">${esc(t.why)}</div>
+    <div class="tmeta"><span>${esc(t.title)}</span><span>·</span><span>${esc(t.owner)}</span></div></div>`;
+}
+function findTask(id){const ib=inboxData();for(const b of ['overdue','today','upcoming']){const t=((ib.buckets||{})[b]||[]).find(x=>x.id===id);if(t)return t;}return null;}
+function selectTask(id){
+  const t=findTask(id);if(!t)return;selTask=id;
+  pendingFocus={deal_id:t.deal_id,section:t.section,stage:t.section_stage};
+  renderInbox();
+  if(location.hash==='#/deal/'+t.deal_id)route();      // already there → re-render & focus
+  else location.hash='#/deal/'+t.deal_id;               // else navigate (route() fires)
+}
+/* After a deal renders, expand the relevant stage and scroll the section into view. */
+function applyFocus(d){
+  if(!pendingFocus||pendingFocus.deal_id!==d.id)return;
+  const f=pendingFocus;pendingFocus=null;
+  if(f.stage&&['gate','prep','followup'].includes(f.section)){openStages[d.id]=openStages[d.id]||{};openStages[d.id][f.stage]=true;renderDeal(d.id);}
+  const sel={prep:'#stage-'+f.stage,gate:'#stage-'+f.stage,followup:'#stage-'+f.stage,
+    stakeholders:'#panel-stakeholders',routing:'#panel-stakeholders',activity:'#panel-activity'}[f.section];
+  setTimeout(()=>{const el=sel&&$(sel);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.add('focus-flash');setTimeout(()=>el.classList.remove('focus-flash'),1400);}},60);
+}
 
 /* ---------- capture helpers ---------- */
 function capVal(id,iid){const s=dst(id);return s.cap[iid]!=null?s.cap[iid]:'';}
@@ -254,6 +346,7 @@ function renderDeal(id){
      ${dcsBig(d)}</div>
    <div class="dlayout"><div>${d.loss?lossPanel(d):''}${stagesHTML}</div>
      <div>${dcsPanel(d)}${stakePanel(d)}${activityPanel(d)}</div></div>`;
+  applyFocus(d);
 }
 function dcsBig(d){const c=d.dcs.color,s=d.dcs.score;const col=c==='green'?'var(--green)':c==='yellow'?'var(--amber)':c==='red'?'var(--red)':'var(--faint)';const bg=c==='green'?'var(--green-bg)':c==='yellow'?'var(--amber-bg)':c==='red'?'var(--red-bg)':'var(--panel2)';
   return `<div style="text-align:center"><div class="ring" style="background:${bg};color:${col}">${s==null?'—':s}</div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em">Confidence</div></div>`;}
@@ -264,7 +357,7 @@ function stageSection(d,s,i){
   const bant=s.key==='disc'?bantPanel(d):'';
   const roi=s.key==='roi'?roiCalc(d):'';
   const notes=`<div class="snotes"><label>Notes — ${esc(s.name)}</label><textarea placeholder="Capture anything for this stage…" oninput="setNote('${d.id}','${s.key}',this.value)">${esc(dst(d.id).notes[s.key]||'')}</textarea></div>`;
-  return `<div class="stage ${open?'open':''} ${cur?'cur':''} ${done?'done':''}">
+  return `<div class="stage ${open?'open':''} ${cur?'cur':''} ${done?'done':''}" id="stage-${s.key}">
     <div class="stage-head" onclick="toggleStage('${d.id}','${s.key}')">
       <div class="stage-num">${done?'✓':i+1}</div>
       <div class="stage-tt"><div class="nm">${esc(s.name)}${cur?' <span class="cur-tag">Current</span>':''}</div><div class="bl">${esc(s.blurb)}</div></div>
@@ -352,13 +445,13 @@ function dcsPanel(d){const sc=d.dcs.scores||{};const dims=[['pain','Pain'],['cha
   const alerts=(d.alerts||[]).map(a=>`<div class="flag ${a.sev}" style="margin-top:6px">${esc(a.text)}</div>`).join('');
   const tag=d.ai_engine?`<span class="engtag ${d.ai_engine}">${d.ai_engine==='claude'?'Claude':'Heuristic'}</span>`:'';
   return `<div class="panel"><h3>Deal Confidence ${tag}<span class="ct">${d.dcs.score==null?'—':d.dcs.score}</span></h3>${bars?`<div class="bars">${bars}</div>`:'<div class="empty" style="padding:4px 0">No scored calls yet.</div>'}${alerts}${d.dcs.rationale?`<div class="rationale">${esc(d.dcs.rationale)}</div>`:''}</div>`;}
-function stakePanel(d){if(!d.stakeholders.length)return '';const ps=d.stakeholders.map(s=>{const dm=/\b(vp|chief|coo|ceo|cfo|president|owner|founder|head|director|vice)\b/i.test(s.title||'');return `<div class="p ${dm?'dm':''}"><b>${esc(s.name)}</b>${s.title?` <span>· ${esc(s.title)}</span>`:''}</div>`;}).join('');
-  return `<div class="panel"><h3>Stakeholders <span class="ct">${d.stakeholders.length}</span></h3><div class="stk">${ps}</div></div>`;}
+function stakePanel(d){if(!d.stakeholders.length)return `<div class="panel" id="panel-stakeholders"><h3>Stakeholders <span class="ct">0</span></h3><div class="empty" style="padding:4px 0">No stakeholder on file — single-threaded. Add a 2nd contact / confirm routing.</div></div>`;const ps=d.stakeholders.map(s=>{const dm=/\b(vp|chief|coo|ceo|cfo|president|owner|founder|head|director|vice)\b/i.test(s.title||'');return `<div class="p ${dm?'dm':''}"><b>${esc(s.name)}</b>${s.title?` <span>· ${esc(s.title)}</span>`:''}</div>`;}).join('');
+  return `<div class="panel" id="panel-stakeholders"><h3>Stakeholders <span class="ct">${d.stakeholders.length}</span></h3><div class="stk">${ps}</div></div>`;}
 function lossPanel(d){const l=d.loss;if(!l)return'';return `<div class="panel loss"><h3 style="color:var(--lost)">Loss post-mortem</h3>${l.reason?`<div style="font-size:13px;color:var(--muted);line-height:1.5"><b style="color:var(--lost)">Why:</b> ${esc(l.reason)}</div>`:''}${l.lessons?`<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-top:8px"><b style="color:var(--lost)">Lesson:</b> ${esc(l.lessons)}</div>`:''}</div>`;}
 function activityPanel(d){const items=(d.timeline||[]).slice(0,40);const lbl={call:'Call',email:'Email',meeting:'Meeting',note:'Note',stage:'Stage'};
   const body=items.map(it=>{const btn=it.kind==='call'?` · <a class="lk" onclick="showCall('${d.id}','${it.ref}',event)">summary</a>`:'';
     return `<div class="it"><span class="ktag">${lbl[it.kind]||'—'}</span><div><div class="ti">${esc(it.title)}</div><div class="mt">${esc(it.sub||'')}${it.sub?' · ':''}${esc(fmtDate(it.ts))}${btn}</div></div></div>`;}).join('');
-  return `<div class="panel"><h3 style="cursor:pointer" onclick="this.parentNode.querySelector('.act').classList.toggle('hide');this.querySelector('.tg').textContent=this.querySelector('.tg').textContent==='+'?'–':'+'">Activity <span class="ct"><span class="tg">+</span> ${d.calls.length} calls · ${d.emails.length} emails</span></h3><div class="act hide">${body||'<div class="empty">No activity.</div>'}</div></div>`;}
+  return `<div class="panel" id="panel-activity"><h3 style="cursor:pointer" onclick="this.parentNode.querySelector('.act').classList.toggle('hide');this.querySelector('.tg').textContent=this.querySelector('.tg').textContent==='+'?'–':'+'">Activity <span class="ct"><span class="tg">+</span> ${d.calls.length} calls · ${d.emails.length} emails</span></h3><div class="act hide">${body||'<div class="empty">No activity.</div>'}</div></div>`;}
 
 /* ---------- call popover + KB ---------- */
 function showCall(did,gid,e){e.stopPropagation();const d=dealById(did);const c=d.calls.find(x=>x.gid===gid);const p=$('#pop');if(!c)return;
