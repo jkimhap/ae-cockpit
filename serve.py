@@ -17,6 +17,9 @@ import assemble, ui, tasks
 
 LOCK = threading.Lock()
 PORT = int(os.environ.get("COCKPIT_PORT", "8787"))
+# Bind to all interfaces so the cockpit is reachable from another machine over
+# the LAN or (privately) over Tailscale — not just localhost on the Mac mini.
+HOST = os.environ.get("COCKPIT_HOST", "0.0.0.0")
 DEFAULT_REP = os.environ.get("COCKPIT_REP", "grant")
 
 def cached_payload(rep):
@@ -74,6 +77,6 @@ class H(BaseHTTPRequestHandler):
             self._send(404, json.dumps({"error": "not found"}))
 
 if __name__ == "__main__":
-    print(f"AE Cockpit  →  http://localhost:{PORT}/?rep={DEFAULT_REP}")
+    print(f"SalesOS Cockpit  →  http://localhost:{PORT}/?rep={DEFAULT_REP}  (binding {HOST})")
     print("Ctrl-C to stop.")
-    ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
+    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
