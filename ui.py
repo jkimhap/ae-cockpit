@@ -188,6 +188,77 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .ibtoggle{display:none}
 @media(max-width:900px){.ibtoggle{display:inline-flex}}
 .focus-flash{animation:flash 1.4s ease-out}@keyframes flash{0%{box-shadow:0 0 0 3px var(--accent-soft)}100%{box-shadow:none}}
+/* ===== Reimagined deal workspace (task-centric) ===== */
+.statusbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;padding:13px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.statusbar .next{font-size:13px;font-weight:600;color:var(--ink);line-height:1.4;min-width:0}
+.statusbar .next .lab{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-right:6px}
+.grts{display:flex;gap:7px;margin-left:auto;flex-wrap:wrap}
+.grt{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--line2);background:#fff;color:var(--muted)}
+.grt .gi{font-weight:800;font-size:10px}
+.grt.ok{color:var(--green);border-color:var(--green-bg);background:var(--green-bg)}
+.grt.warn{color:var(--amber);border-color:var(--amber-bg);background:var(--amber-bg)}
+.grt.bad{color:var(--red);border-color:var(--red-bg);background:var(--red-bg)}
+.sec-h{display:flex;align-items:baseline;gap:9px;margin:24px 0 12px}
+.sec-h .nm{font-size:13px;font-weight:700;letter-spacing:.02em}.sec-h .ct{font-size:12px;color:var(--faint)}
+.aq{display:flex;flex-direction:column;gap:12px}
+.acard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm)}
+.acard.urgent{border-left:3px solid var(--red)}.acard.soon{border-left:3px solid var(--amber)}
+.acard-h{display:flex;align-items:center;gap:9px;padding:13px 15px;border-bottom:1px solid var(--line)}
+.acard-h .ti{font-weight:600;font-size:14px;letter-spacing:-0.01em}
+.acard-h .u{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:5px}
+.acard-h .u.overdue{background:var(--red-bg);color:var(--red)}.acard-h .u.today{background:var(--amber-bg);color:var(--amber)}.acard-h .u.upcoming{background:var(--accent-soft);color:var(--accent-ink)}
+.acard .why{padding:11px 15px 0;font-size:12px;color:var(--muted);line-height:1.45}
+.acard .did{margin:11px 15px 0;padding:8px 11px;background:var(--accent-soft);border-radius:8px;font-size:12px;color:var(--accent-ink);line-height:1.45;display:flex;gap:9px;align-items:flex-start}
+.acard .did b{font-weight:700;flex-shrink:0}
+.artifact{margin:12px 15px 0}
+.draftbox{width:100%;border:1px solid var(--line2);border-radius:9px;padding:11px 12px;font-size:12.5px;line-height:1.55;resize:vertical;min-height:140px;outline:none;background:var(--panel2);color:var(--ink);white-space:pre-wrap;font-family:inherit}
+.draftbox:focus{border-color:var(--accent);background:#fff}
+.f-meta{font-size:11px;color:var(--faint);margin-bottom:7px;display:flex;gap:7px;flex-wrap:wrap}
+.f-meta .pill{background:var(--panel2);border-radius:6px;padding:2px 8px;color:var(--muted);font-weight:500}
+.prepsheet{font-size:12.5px;line-height:1.55}
+.prepsheet .blk{margin-top:11px}.prepsheet .blk:first-child{margin-top:0}
+.prepsheet .bh{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}
+.prepsheet ul{margin:0;padding-left:17px}.prepsheet li{margin-bottom:4px}.qlist li{color:var(--ink)}
+.gateprop{border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.gaterow{padding:10px 12px;border-bottom:1px solid var(--line)}.gaterow:last-child{border-bottom:none}
+.gaterow .gl{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}.gaterow .gl .g{width:6px;height:6px;border-radius:50%;background:var(--disc);flex-shrink:0}
+.gaterow .gv{font-size:12.5px;color:var(--ink);margin-top:3px}
+.gaterow .gev{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:4px;line-height:1.4;border-left:2px solid var(--line2);padding-left:8px}
+.gaterow .gacts{display:flex;gap:7px;margin-top:8px}
+.aq-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:13px 15px;border-top:1px solid var(--line);margin-top:12px;background:var(--panel2)}
+.aq-acts .spacer{margin-left:auto}
+.btn{font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;border:1px solid var(--line2);background:#fff;color:var(--ink)}.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}.btn.primary:hover{opacity:.9}
+.btn.ai{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent-soft)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}.btn.ghost:hover{color:var(--ink);border-color:var(--line2)}
+.btn.sm{font-size:11px;padding:4px 10px}
+.resolved{margin-top:10px}
+.rsv-row{display:flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:12px;color:var(--muted);background:var(--panel2)}
+.rsv-row .tick{color:var(--green);font-weight:700}.rsv-row .undo{margin-left:auto}
+.allclear{padding:24px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line2);border-radius:var(--radius);font-size:12.5px;line-height:1.5}
+.allclear .big{font-size:14px;font-weight:600;color:var(--green);margin-bottom:4px}
+.facts-wrap{margin-top:22px}
+.facts-toggle{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;padding:8px 0}.facts-toggle:hover{color:var(--ink)}.facts-toggle .cv{font-size:11px}
+.facts-grid{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start;margin-top:6px}
+@media(max-width:1020px){.facts-grid{grid-template-columns:1fr}}
+.factbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin-bottom:13px}
+.factbox h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:11px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:12.5px}.kv .k{color:var(--muted)}.kv .v{font-weight:500;text-align:right}
+/* Ask the agent dock */
+.askdock{margin-top:26px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.askdock-h{display:flex;align-items:center;gap:8px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.askdock-h .ic{width:8px;height:8px;border-radius:50%;background:var(--accent-ink)}
+.askdock-h b{font-size:13px;font-weight:600}.askdock-h span{font-size:11px;color:var(--faint)}
+.asklog{padding:6px 15px;max-height:300px;overflow:auto}
+.askmsg{margin:9px 0;font-size:12.5px;line-height:1.5}
+.askmsg.you{text-align:right}.askmsg.you .b{background:var(--ink);color:#fff;border-radius:12px 12px 4px 12px}
+.askmsg .b{display:inline-block;padding:8px 12px;border-radius:12px 12px 12px 4px;background:var(--panel2);max-width:88%;text-align:left}
+.askmsg.agent .b{border:1px solid var(--line)}
+.askchips{display:flex;gap:7px;flex-wrap:wrap;padding:10px 15px 4px}
+.askchip{font-size:11.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border-radius:18px;padding:5px 11px;cursor:pointer}.askchip:hover{opacity:.85}
+.askin{display:flex;gap:8px;padding:12px 15px;border-top:1px solid var(--line)}
+.askin input{flex:1;border:1px solid var(--line2);border-radius:10px;padding:9px 12px;outline:none;font-size:13px}.askin input:focus{border-color:var(--accent)}
+.askin button{background:var(--ink);color:#fff;font-weight:600;font-size:12.5px;padding:9px 16px;border-radius:10px}
 </style></head>
 <body>
 <header class="topbar">
@@ -273,19 +344,16 @@ function taskRow(t){
 function findTask(id){const ib=inboxData();for(const b of ['overdue','today','upcoming']){const t=((ib.buckets||{})[b]||[]).find(x=>x.id===id);if(t)return t;}return null;}
 function selectTask(id){
   const t=findTask(id);if(!t)return;selTask=id;
-  pendingFocus={deal_id:t.deal_id,section:t.section,stage:t.section_stage};
+  pendingFocus={deal_id:t.deal_id,task_id:t.id};
   renderInbox();
   if(location.hash==='#/deal/'+t.deal_id)route();      // already there → re-render & focus
   else location.hash='#/deal/'+t.deal_id;               // else navigate (route() fires)
 }
-/* After a deal renders, expand the relevant stage and scroll the section into view. */
+/* After a deal renders, scroll the clicked task's action card into view and flash it. */
 function applyFocus(d){
   if(!pendingFocus||pendingFocus.deal_id!==d.id)return;
-  const f=pendingFocus;pendingFocus=null;
-  if(f.stage&&['gate','prep','followup'].includes(f.section)){openStages[d.id]=openStages[d.id]||{};openStages[d.id][f.stage]=true;renderDeal(d.id);}
-  const sel={prep:'#stage-'+f.stage,gate:'#stage-'+f.stage,followup:'#stage-'+f.stage,
-    stakeholders:'#panel-stakeholders',routing:'#panel-stakeholders',activity:'#panel-activity'}[f.section];
-  setTimeout(()=>{const el=sel&&$(sel);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.add('focus-flash');setTimeout(()=>el.classList.remove('focus-flash'),1400);}},60);
+  const tid=pendingFocus.task_id;pendingFocus=null;
+  setTimeout(()=>{const el=tid&&document.getElementById('acard-'+tid);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('focus-flash');setTimeout(()=>el.classList.remove('focus-flash'),1400);}},80);
 }
 
 /* ---------- capture helpers ---------- */
@@ -336,17 +404,187 @@ function renderMain(){
 let openStages={};
 function renderDeal(id){
   const d=dealById(id);const v=$('#view');if(!d){v.innerHTML='<div class="empty">Deal not found.</div>';return;}
-  if(!openStages[id])openStages[id]={[d.rubric_stage]:true};
-  const stagesHTML=D.rubric.map((s,i)=>stageSection(d,s,i)).join('');
+  const all=dealTasks(id);
+  const open=all.filter(t=>!tStatus(id,t.id));
+  const resolved=all.filter(t=>tStatus(id,t.id));
   v.innerHTML=`<a class="back" onclick="location.hash='#/'">← All deals</a>
    <div class="dhead"><div><div class="co">${esc(d.company)}</div>
      <div class="meta">${stageChip(d.stage)} <span class="sep">·</span> <b class="tnum">${money(d.arr||d.amount)}</b>
-       <span class="sep">·</span> ${esc(d.dealtype==='newbusiness'?'New business':d.dealtype)}${d.industry?`<span class="sep">·</span> ${esc(d.industry)}`:''}${d.employees?`<span class="sep">·</span> ${d.employees} employees`:''}
+       <span class="sep">·</span> ${esc(d.dealtype==='newbusiness'?'New business':d.dealtype||'—')}${d.industry?`<span class="sep">·</span> ${esc(d.industry)}`:''}${d.employees?`<span class="sep">·</span> ${d.employees} employees`:''}
        <span class="sep">·</span> via ${esc(d.source)}${/orum/i.test(d.source)?' ☎':''}<span class="sep">·</span> <a class="lk" href="${d.hubspot_url}" target="_blank">HubSpot ↗</a></div></div>
      ${dcsBig(d)}</div>
-   <div class="dlayout"><div>${d.loss?lossPanel(d):''}${stagesHTML}</div>
-     <div>${dcsPanel(d)}${stakePanel(d)}${activityPanel(d)}</div></div>`;
+   ${d.loss?`<div style="margin-top:14px">${lossPanel(d)}</div>`:''}
+   ${statusBar(d,open)}
+   <div class="sec-h"><span class="nm">What needs you</span><span class="ct">${open.length} open${resolved.length?` · ${resolved.length} resolved`:''}</span></div>
+   ${open.length?`<div class="aq">${open.map(t=>actionCard(d,t)).join('')}</div>`:`<div class="allclear"><div class="big">✓ All clear</div>Nothing needs you on this deal right now. The agent is watching it and will surface the next step.</div>`}
+   ${resolved.length?`<div class="resolved">${resolved.map(t=>resolvedRow(d,t)).join('')}</div>`:''}
+   ${factsSection(d)}
+   ${askDock(d)}`;
   applyFocus(d);
+}
+
+/* ===== Task-centric workspace engine (Phase 1) =====
+   The right pane is no longer a call teleprompter. It's the AE's command center:
+   the agent's proposed work for THIS deal, each item showing what the agent did
+   + an editable artifact + dispose/approve. The agent never sends — the human does. */
+function dealTasks(id){const ib=inboxData();const out=[];['overdue','today','upcoming'].forEach(b=>((ib.buckets||{})[b]||[]).forEach(t=>{if(t.deal_id===id)out.push(t);}));return out;}
+function tStatus(id,tid){return (dst(id).tdis||{})[tid];}
+function setTStatus(id,tid,st){const s=dst(id);s.tdis=s.tdis||{};if(st)s.tdis[tid]=st;else delete s.tdis[tid];save(id,s);renderDeal(id);}
+
+/* ---- status bar + the four guarantees ---- */
+function statusBar(d,open){
+  const next=open[0];
+  const nextTxt=next?`<span class="lab">Next</span> ${esc(next.title)} — <span style="color:var(--muted);font-weight:500">${esc(next.why)}</span>`
+    :`<span class="lab">Status</span> No open actions — deal is on track.`;
+  return `<div class="statusbar"><div class="next">${nextTxt}</div><div class="grts">${guaranteeChips(d,open)}</div></div>`;
+}
+function guaranteeChips(d,open){
+  const worst=ts=>ts.some(t=>t.urgency==='overdue')?'bad':ts.length?'warn':'ok';
+  const ic=st=>st==='ok'?'✓':st==='bad'?'!':'⚠';
+  const chip=(label,types)=>{const ts=open.filter(x=>types.includes(x.type));const st=worst(ts);return `<span class="grt ${st}"><span class="gi">${ic(st)}</span>${label}</span>`;};
+  const b=bantScore(d.id);let gSt,gLab;
+  if(b.filled){gLab=`Gate · BANT ${b.total}`;gSt=b.total>=50?'ok':'bad';}
+  else{gSt=open.some(t=>t.type==='Gate-Capture')?'warn':'ok';gLab='Gate';}
+  return [chip('Routing',['Routing-Check']),chip('Prep',['Call Prep']),chip('Follow-up',['Draft Follow-up','Multi-thread','Watch']),
+    `<span class="grt ${gSt}"><span class="gi">${ic(gSt)}</span>${gLab}</span>`].join('');
+}
+
+/* ---- action cards ---- */
+function actionCard(d,t){
+  const u=t.urgency;const cls=u==='overdue'?'urgent':u==='today'?'soon':'';
+  const tb=TBADGE[t.type]||['watch',t.type];
+  return `<div class="acard ${cls}" id="acard-${esc(t.id)}">
+    <div class="acard-h"><span class="tbadge ${tb[0]}">${esc(tb[1])}</span><span class="ti">${esc(t.title)}</span><span class="u ${u}">${u}</span></div>
+    <div class="why">${esc(t.why)}</div>
+    <div class="did"><b>Agent</b><span>${agentDid(d,t)}</span></div>
+    ${artifactFor(d,t)}</div>`;
+}
+function agentDid(d,t){const hasAI=d.ai_fields&&Object.keys(d.ai_fields).length;return ({
+  'Call Prep':'Assembled a prep sheet from HubSpot + the latest Gong call. Skim it and you can walk in cold-proofed.',
+  'Draft Follow-up':'Drafted the note below from the deal context. Edit anything, then send it from your own inbox.',
+  'Gate-Capture':hasAI?'Pulled the gate values from the transcript with the supporting quote. Accept or correct each.':'Will extract these from the latest Gong transcript on the next pass — confirm what to capture.',
+  'Routing-Check':'Ran this deal through the routing rules and flagged it so a mis-routed lead can’t slip through.',
+  'Multi-thread':'Drafted an intro to a second stakeholder so the deal stops being single-threaded.',
+  'Watch':'Noticed this deal went quiet past the inactivity line and drafted a re-engagement nudge.'
+}[t.type]||'Surfaced this for your review.');}
+function artifactFor(d,t){switch(t.type){
+  case 'Call Prep':return prepArtifact(d,t);
+  case 'Draft Follow-up':return draftArtifact(d,t);
+  case 'Gate-Capture':return gateArtifact(d,t);
+  case 'Routing-Check':return routingArtifact(d,t);
+  case 'Multi-thread':return emailArtifact(d,t,multiText(d),'Second-stakeholder intro');
+  case 'Watch':return emailArtifact(d,t,watchText(d),'Re-engagement nudge');
+  default:return actsBar(d,t,[['Mark done','done','primary']]);}}
+
+/* generic actions row; every card can hand off to the AI dock */
+function actsBar(d,t,btns){
+  const b=btns.map(x=>`<button class="btn ${x[2]||''}" onclick="taskAct('${d.id}','${esc(t.id)}','${x[1]}')">${esc(x[0])}</button>`).join('');
+  return `<div class="aq-acts">${b}<span class="spacer"></span><button class="btn ai" onclick="askTask('${d.id}','${esc(t.id)}')">Ask AI to revise</button></div>`;
+}
+function taskAct(id,tid,act){
+  if(act==='copydraft')return copyDraft(tid);
+  if(act==='copyprep')return copyPrep(tid);
+  if(act==='done'){setTStatus(id,tid,'done');toast('Done — logged. (Phase 2 syncs this to HubSpot.)');return;}
+  if(act==='disposed'){setTStatus(id,tid,'disposed');toast('Dismissed — the agent won’t resurface this.');return;}
+}
+function resolvedRow(d,t){const st=tStatus(d.id,t.id);
+  return `<div class="rsv-row"><span class="tick">${st==='disposed'?'✕':'✓'}</span><span>${esc(t.title)}</span><span style="color:var(--faint)">· ${st==='disposed'?'dismissed':'done'}</span><a class="lk undo" onclick="setTStatus('${d.id}','${esc(t.id)}',null)">undo</a></div>`;}
+
+/* ---- artifacts ---- */
+function firstName(d){const n=(d.primary_contact&&d.primary_contact.name)||'';return n?n.split(' ')[0]:'there';}
+function nextStepLine(d){return d.stage==='Discovery'?'a tailored demo built from your onboarding materials':d.stage==='Demo'?'the ROI walkthrough + pricing':d.stage==='Quote'||d.stage==='Verbal'?'finalizing the proposal and timeline':'the next working session';}
+function followupText(d){const f=firstName(d);
+  return `Subject: Following up — Quinn x ${d.company}\n\nHi ${f},\n\nThanks again for the time. Quick recap of where we landed:\n\n• The challenge you flagged: getting new field hires productive faster without pulling your best people off the job to train them\n• How Quinn maps to it: courses built from your own materials that your team can ship in days\n• Next step: ${nextStepLine(d)}\n\nAnything useful I can get in front of you before then? Happy to loop in whoever else should be in the room.\n\nBest,\n${D.rep}`;}
+function multiText(d){const f=firstName(d);
+  return `Subject: Quick intro — Quinn x ${d.company}\n\nHi [second stakeholder],\n\n${f} and I have been working through how ${d.company} ramps and retains field staff. Given your role, your read would be valuable before we go further.\n\nWould 20 minutes next week work? I’ll tailor it to what matters most to you.\n\nBest,\n${D.rep}`;}
+function watchText(d){const f=firstName(d);
+  return `Subject: Still the right time, ${f}?\n\nHi ${f},\n\nWanted to gently re-surface this — I know priorities shift. If onboarding/retention is still on the list this quarter, I can send a 2-minute example built from your world. If the timing’s off, just say so and I’ll circle back later.\n\nBest,\n${D.rep}`;}
+
+function emailArtifact(d,t,gen,kind){
+  const saved=(dst(d.id).drafts||{})[t.id];const txt=saved!=null?saved:gen;
+  return `<div class="artifact"><div class="f-meta"><span class="pill">${esc(kind)}</span><span class="pill">Editable · sends from your inbox, never auto-sent</span></div>
+    <textarea class="draftbox" id="draft-${esc(t.id)}" oninput="onDraft('${d.id}','${esc(t.id)}',this.value)">${esc(txt)}</textarea></div>`
+    +actsBar(d,t,[['Copy draft','copydraft','primary'],['Mark sent','done',''],['Dismiss','disposed','ghost']]);
+}
+function draftArtifact(d,t){return emailArtifact(d,t,followupText(d),'Follow-up email');}
+function onDraft(id,tid,v){const s=dst(id);s.drafts=s.drafts||{};s.drafts[tid]=v;save(id,s);}
+function copyDraft(tid){const el=document.getElementById('draft-'+tid);if(el){navigator.clipboard&&navigator.clipboard.writeText(el.value);toast('Draft copied — paste into your email');}}
+function copyPrep(tid){const el=document.getElementById('prep-'+tid);if(el){navigator.clipboard&&navigator.clipboard.writeText(el.innerText);toast('Prep sheet copied');}}
+
+function prepArtifact(d,t){
+  const cs=curStageObj(d);
+  const qs=(cs.items||[]).filter(it=>it.prompt).slice(0,5).map(it=>`<li>${esc(it.prompt)}</li>`).join('');
+  const stk=(d.stakeholders||[]).map(s=>`${esc(s.name)}${s.title?' ('+esc(s.title)+')':''}`).join(', ')||'Single-threaded — no 2nd contact yet (add one)';
+  const facts=[`${esc(d.industry||'Industry n/a')} · ${d.employees||'?'} employees`,`Stage: ${esc(d.stage)}${d.dcs&&d.dcs.days_in_stage!=null?' · '+d.dcs.days_in_stage+'d in stage':''}`,`Source: ${esc(d.source||'—')}`];
+  const html=`<div class="prepsheet" id="prep-${esc(t.id)}">
+    <div class="blk"><div class="bh">Key facts</div><ul>${facts.map(f=>`<li>${f}</li>`).join('')}</ul></div>
+    <div class="blk"><div class="bh">Who’s in the room</div><div>${stk}</div></div>
+    ${qs?`<div class="blk"><div class="bh">Questions to ask</div><ul class="qlist">${qs}</ul></div>`:''}
+    <div class="blk"><div class="bh">Bring</div><ul><li>A Quinn customer in ${esc(d.industry||'their space')} to reference</li><li>The tailored example built from their materials</li></ul></div></div>`;
+  return `<div class="artifact">${html}</div>`+actsBar(d,t,[['Copy prep sheet','copyprep','primary'],['Mark ready','done','']]);
+}
+function routingArtifact(d,t){
+  const amount=d.arr||d.amount||0;const emp=d.employees||0;
+  let rec='Within standard AE thresholds — confirm it’s yours and you’re clear to work it.';
+  if(amount>40000)rec=`$${Math.round(amount).toLocaleString()} is above the ~$40k large-deal line → recommend looping in Arlen before advancing.`;
+  else if(emp>=1000)rec=`${emp.toLocaleString()} employees → strategic size; confirm ownership vs. Arlen.`;
+  else if(!(d.stakeholders||[]).length)rec='No contact on file — confirm this lead is correctly routed to you before working it.';
+  return `<div class="artifact"><div class="prepsheet"><div class="blk"><div class="bh">Routing check</div><div>${esc(rec)}</div></div></div></div>`
+    +actsBar(d,t,[['Confirm — it’s mine','done','primary'],['Send to Arlen','done',''],['Dismiss','disposed','ghost']]);
+}
+function gateArtifact(d,t){
+  const cs=curStageObj(d);const gates=(cs.items||[]).filter(it=>it.gate);const af=d.ai_fields||{};
+  const rows=gates.map(it=>{
+    const ai=af[it.id];let body;
+    if(isCap(d.id,it.id)){body=`<div class="gv">✓ ${esc(capVal(d.id,it.id))}</div>`;}
+    else if(ai){body=`<div class="gv">${esc(ai.value)}</div>${ai.evidence?`<div class="gev">${esc(ai.evidence)}</div>`:''}
+      <div class="gacts"><button class="btn sm primary" onclick="acceptField('${d.id}','${it.id}')">Accept</button><button class="btn sm ghost" onclick="dismissField('${d.id}','${it.id}')">Dispose</button>${ai.cite&&ai.cite.gid?`<a class="lk" style="margin-left:4px;align-self:center" onclick="showCall('${d.id}','${ai.cite.gid}',event)">${esc(ai.cite.label||'source')}</a>`:''}</div>`;}
+    else{body=`<div class="gev">Pending — the agent extracts this from the latest Gong transcript on the next pass.</div>`;}
+    return `<div class="gaterow"><div class="gl"><span class="g"></span>${esc(it.label)}</div>${body}</div>`;
+  }).join('');
+  return `<div class="artifact"><div class="gateprop">${rows||'<div class="gaterow">No gate fields on this stage.</div>'}</div>${bantPanel(d)}</div>`
+    +actsBar(d,t,[['Mark captured','done','primary']]);
+}
+
+/* ---- collapsed facts & evidence ---- */
+function factsSection(d){
+  return `<div class="facts-wrap">
+    <div class="facts-toggle" onclick="this.nextElementSibling.classList.toggle('hide');this.querySelector('.cv').textContent=this.nextElementSibling.classList.contains('hide')?'▸':'▾'"><span class="cv">▸</span> Deal facts &amp; evidence — the data behind these actions</div>
+    <div class="facts-grid hide">
+      <div>${factsBox(d)}${bantPanel(d)}${roiCalc(d)}</div>
+      <div>${dcsPanel(d)}${stakePanel(d)}${activityPanel(d)}</div>
+    </div></div>`;
+}
+function factsBox(d){const c=d.primary_contact||{};
+  const rows=[['Stage',esc(d.stage)],['Value',money(d.arr||d.amount)],['Industry',esc(d.industry||'—')],['Employees',d.employees||'—'],['Source',esc(d.source||'—')],['Days in stage',(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—'],['Primary contact',c.name?esc(c.name+(c.title?' · '+c.title:'')):'—']];
+  return `<div class="factbox"><h3>Key facts</h3><div class="kv">${rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')}</div></div>`;
+}
+
+/* ---- Ask the agent dock ---- */
+function askDock(d){
+  return `<div class="askdock" id="askdock">
+    <div class="askdock-h"><span class="ic"></span><b>Ask the agent</b><span>· about ${esc(d.company)}</span></div>
+    <div class="asklog" id="askLog"><div class="askmsg agent"><span class="b">I’m watching this deal. Ask me to draft something, explain why it isn’t qualified, or tell you what’s blocking it — or tap a shortcut.</span></div></div>
+    <div class="askchips">
+      <span class="askchip" onclick="askQuick('${d.id}','draft')">Draft the follow-up</span>
+      <span class="askchip" onclick="askQuick('${d.id}','gate')">Why isn’t this qualified?</span>
+      <span class="askchip" onclick="askQuick('${d.id}','blocking')">What’s blocking this?</span>
+      <span class="askchip" onclick="askQuick('${d.id}','prep')">Build a prep sheet</span></div>
+    <div class="askin"><input id="askInput" placeholder="Ask about ${esc(d.company)}…" onkeydown="if(event.key==='Enter')askSend('${d.id}')"><button onclick="askSend('${d.id}')">Send</button></div></div>`;
+}
+function askAppend(role,html){const log=$('#askLog');if(!log)return;log.insertAdjacentHTML('beforeend',`<div class="askmsg ${role}"><span class="b">${html}</span></div>`);log.scrollTop=log.scrollHeight;}
+function askSend(id){const inp=$('#askInput');if(!inp)return;const q=inp.value.trim();if(!q)return;inp.value='';askAppend('you',esc(q));const d=dealById(id);setTimeout(()=>askAppend('agent',askReply(d,q)),260);}
+function askQuick(id,kind){const d=dealById(id);const label={draft:'Draft the follow-up',gate:'Why isn’t this qualified yet?',blocking:'What’s blocking this deal?',prep:'Build a prep sheet'}[kind]||kind;askAppend('you',esc(label));setTimeout(()=>askAppend('agent',askReply(d,label)),260);}
+function askTask(id,tid){const t=findTask(tid);const inp=$('#askInput');if(inp){inp.value=t?('Revise the '+t.title.toLowerCase()):'Revise this';inp.focus();}const dk=$('#askdock');if(dk)dk.scrollIntoView({behavior:'smooth',block:'center'});}
+function askReply(d,q){
+  const ql=q.toLowerCase();const open=dealTasks(d.id).filter(t=>!tStatus(d.id,t.id));const note=' <span style="color:var(--faint)">· Phase-1 preview — the live agent answers here in Phase 2.</span>';
+  let core;
+  if(/block|stuck|stall|left|holding|next/.test(ql)){core=open.length?('Right now: '+open.map(t=>esc(t.title)+' — '+esc(t.why)).join('<br>')):'Nothing’s blocking it — no open actions on this deal.';}
+  else if(/qualif|bant|gate|score|why is.*not/.test(ql)){const b=bantScore(d.id);core=b.filled?('BANT is '+b.total+'/100 (need 50). '+(b.total>=50?'Qualified.':'Below threshold — strengthen the weak components in the Gate card above.')):'BANT isn’t scored yet. Open the Gate card and accept the extracted values, or score the components.';}
+  else if(/draft|follow|recap|email|write|revise/.test(ql)){const ft=open.find(t=>t.type==='Draft Follow-up');core=ft?'There’s a follow-up draft in your action queue above — edit it and send from your inbox.':'No follow-up is due, but I can draft one. Say the word and I’ll add it to your queue.';}
+  else if(/prep|prepare|meeting|call/.test(ql)){const pt=open.find(t=>t.type==='Call Prep');core=pt?'Your prep sheet is in the action queue above — key facts, who’s in the room, and questions to ask.':'No call is scheduled, so no prep sheet yet. I’ll build one the moment a meeting books.';}
+  else{core='This deal: '+esc(d.stage)+' · '+money(d.arr||d.amount)+' · '+esc(d.industry||'industry n/a')+' · '+((d.stakeholders||[]).length)+' contact(s). '+(open.length?open.length+' open action(s) in your queue above.':'No open actions.');}
+  return core+note;
 }
 function dcsBig(d){const c=d.dcs.color,s=d.dcs.score;const col=c==='green'?'var(--green)':c==='yellow'?'var(--amber)':c==='red'?'var(--red)':'var(--faint)';const bg=c==='green'?'var(--green-bg)':c==='yellow'?'var(--amber-bg)':c==='red'?'var(--red-bg)':'var(--panel2)';
   return `<div style="text-align:center"><div class="ring" style="background:${bg};color:${col}">${s==null?'—':s}</div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em">Confidence</div></div>`;}
