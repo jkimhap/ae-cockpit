@@ -443,10 +443,9 @@ function renderMain(){
     const note=f.synthetic?'<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">Pre-qualified — Discovery booked, call not yet held. The agent drops the pre-Discovery prep sheet here.</div>':'';
     body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div>${note}<div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
   }else{
-    OPEN_ORDER.forEach(st=>{const ds=ods.filter(d=>d.stage===st);if(!ds.length)return;
-      body+=`<div class="grp"><div class="grp-h"><span class="nm">${st}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div><div class="grid">${ds.map(dealCard).join('')}</div></div>`;});
-    if(!body)body='<div class="empty">No open deals.</div>';
-    body+=`<div class="grp"><div class="grp-h"><span class="toggle" onclick="this.closest('.grp').querySelector('.cl').classList.toggle('hide');this.querySelector('b').textContent=this.querySelector('b').textContent==='+'?'–':'+'"><b>+</b> Closed (${closed.length})</span></div><div class="cl hide grid">${closed.map(dealCard).join('')||'<div class="empty">None.</div>'}</div></div>`;
+    // No stage selected (or just deselected): show NO deal cards. The funnel is the
+    // navigator — click a stage box to reveal its deals. (Won/Lost are funnel tiles too.)
+    body=`<div class="empty" style="margin-top:18px">Click a stage above to see its deals.</div>`;
   }
   v.innerHTML=`<div class="h1">Pipeline</div><div class="sub">${ods.length} open deals · ${money(ods.reduce((s,d)=>s+(d.arr||d.amount||0),0))} open pipeline</div>
     ${up?`<div class="grp"><div class="grp-h"><span class="nm">Upcoming</span></div><div class="up-row">${up}</div></div>`:''}
