@@ -98,7 +98,8 @@ def deals_for_owner(owner_id, stage_ids):
 
 def companies_for(ids):
     return batch_read("companies", ids,
-        ["name","domain","industry","numberofemployees","annualrevenue","city","state","numberoflocations"])
+        ["name","domain","industry","industry_category","numberofemployees","annualrevenue",
+         "city","state","numberoflocations","description","website","linkedin_company_page"])
 
 def contacts_for(ids):
     return batch_read("contacts", ids,

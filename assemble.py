@@ -177,8 +177,10 @@ def assemble(rep, full=True, log=print):
                 "amount":_num(p.get("amount")),"arr":_num(p.get("amount")),
                 "source":(p.get("hs_analytics_source_data_1") or p.get("hs_analytics_source") or "—"),
                 "dealtype":p.get("dealtype") or "newbusiness",
-                "industry":co.get("industry") or "","employees":_num(co.get("numberofemployees")),
+                "industry":co.get("industry_category") or co.get("industry") or "","employees":_num(co.get("numberofemployees")),
                 "locations":co.get("numberoflocations") or "","icp":"",
+                "company_desc":co.get("description") or "","website":co.get("website") or "",
+                "company_linkedin":co.get("linkedin_company_page") or "",
                 "domain":(co.get("domain") or "").lower(),
                 "primary_contact":{"name":primary.get("name",""),"title":primary.get("title","")},
                 "stakeholders":stake,"calls":calls,"emails":elist,"timeline":tl,
@@ -197,9 +199,21 @@ def assemble(rep, full=True, log=print):
         analyze = b not in ("closed_won",)   # open + closed_lost
         res = None
         if full and analyze:
-            cmeta = gong_by_deal.get(deal["id"], [])
+            cmeta = gong_by_deal.get(deal["id"], [])   # most-recent-first
+            # Cover BOTH ends: the earliest call (where Discovery/BANT lives) and the
+            # most recent activity. For >6 calls, take the 4 newest + 2 oldest, dedup,
+            # then read them chronologically (discovery first) so the model sees the
+            # full arc and isn't starved of discovery context on later-stage deals.
+            if len(cmeta) <= 6:
+                sel = list(cmeta)
+            else:
+                sel, seen = [], set()
+                for c in cmeta[:4] + cmeta[-2:]:
+                    if c["id"] not in seen:
+                        seen.add(c["id"]); sel.append(c)
+            sel.sort(key=lambda c: c["date"] or "")   # chronological: discovery → latest
             calls_ctx = [{"id":c["id"],"title":c["title"],"date":c["date"],"transcript":tx_for_ai.get(c["id"],"")}
-                         for c in cmeta][:3]
+                         for c in sel]
             res = ai.analyze_deal(
                 {"id":deal["id"],"name":deal["company"],"stage_label":deal["stage"],"bucket":b,
                  "amount":deal["amount"],"company":deal["company"],"industry":deal["industry"],

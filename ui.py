@@ -39,12 +39,21 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .grp{margin-top:26px}.grp-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
 .grp-h .nm{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .grp-h .ct{font-size:12px;color:var(--faint)}
-.funnel{display:grid;grid-template-columns:repeat(4,1fr) .82fr .82fr;gap:9px}
+.funnel{display:grid;grid-template-columns:repeat(5,1fr) .82fr .82fr;gap:9px}
+@media(max-width:1100px){.funnel{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:680px){.funnel{grid-template-columns:repeat(2,1fr)}}
 .fstage{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;cursor:pointer;transition:.13s;position:relative;overflow:hidden}
 .fstage:hover{box-shadow:var(--shadow);transform:translateY(-1px)}.fstage.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.fstage.synthetic{border-style:dashed;background:var(--panel2)}
 .fstage .fb{position:absolute;left:0;top:0;height:3px;width:100%}
 .fstage .lab{font-size:11.5px;font-weight:600;color:var(--muted)}.fstage .n{font-size:28px;font-weight:600;letter-spacing:-0.03em;margin-top:6px}
 .fstage .arr{color:var(--faint);font-size:11.5px;margin-top:2px;font-weight:500}
+.frollup{margin-top:9px;display:flex;flex-direction:column;gap:3px}
+.frl{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px}
+.frl .fk{color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.frl.ok{background:var(--green-bg)}.frl.ok .fv{color:var(--green)}
+.frl.warn{background:var(--amber-bg)}.frl.warn .fv{color:var(--amber)}
+.frl.bad{background:var(--red-bg)}.frl.bad .fv{color:var(--red)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;cursor:pointer;transition:.13s}
 .card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
@@ -259,6 +268,24 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .askin{display:flex;gap:8px;padding:12px 15px;border-top:1px solid var(--line)}
 .askin input{flex:1;border:1px solid var(--line2);border-radius:10px;padding:9px 12px;outline:none;font-size:13px}.askin input:focus{border-color:var(--accent)}
 .askin button{background:var(--ink);color:#fff;font-weight:600;font-size:12.5px;padding:9px 16px;border-radius:10px}
+/* Key facts — the live deal record */
+.keyfacts{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px}
+.kf-h{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+.kf-h b{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.kf-note{font-size:11px;color:var(--faint)}
+.kf-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 26px}
+@media(max-width:760px){.kf-grid{grid-template-columns:1fr}}
+.kf-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);min-height:34px}
+.kf-l{width:104px;flex:none;color:var(--muted);font-size:12px}
+.kf-v{flex:1;font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.kf-empty{color:var(--faint);font-weight:400;font-style:italic}
+.kf-src{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;border-radius:9px}
+.kf-src.you{background:var(--accent-soft);color:var(--accent-ink)}
+.kf-src.gong{background:var(--green-bg);color:var(--green)}
+.kf-src.hs{background:var(--panel2);color:var(--faint)}
+.kf-edit{flex:none;width:24px;height:24px;border-radius:7px;color:var(--faint);font-size:12px;opacity:.5}.kf-edit:hover{opacity:1;background:var(--panel2)}
+.kf-in{flex:1;min-width:120px;border:1px solid var(--accent);border-radius:8px;padding:5px 9px;font-size:12.5px;outline:none}
+.kf-desc{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5}
 </style></head>
 <body>
 <header class="topbar">
@@ -360,7 +387,8 @@ function applyFocus(d){
 function capVal(id,iid){const s=dst(id);return s.cap[iid]!=null?s.cap[iid]:'';}
 function isCap(id,iid){return capVal(id,iid)!=='';}
 function stageProg(d,stage){let cap=0,tot=stage.items.length,gates=0,gmet=0;stage.items.forEach(it=>{if(isCap(d.id,it.id))cap++;if(it.gate){gates++;if(isCap(d.id,it.id))gmet++;}});return {cap,tot,gates,gmet};}
-function dcsBadge(d){const s=d.dcs.score;return `<span class="dcs ${d.dcs.color}"><span class="d"></span>${s==null?'—':s}</span>`;}
+function isWon(d){return d.stage_id==='1090549670';}
+function dcsBadge(d){if(isWon(d))return `<span class="dcs green"><span class="d"></span>Won</span>`;const s=d.dcs.score;return `<span class="dcs ${d.dcs.color}"><span class="d"></span>${s==null?'—':s}</span>`;}
 function stageChip(s){return `<span class="chip st-${s}">${s}</span>`;}
 function alertFlags(d){return (d.alerts||[]).slice(0,2).map(a=>`<div class="flag ${a.sev}">${esc(a.text)}</div>`).join('');}
 
@@ -378,16 +406,42 @@ function dealCard(d){
     ${alertFlags(d)?`<div class="alerts">${alertFlags(d)}</div>`:''}</div>`;
 }
 let filterStage=null;
-const stColor=l=>({Won:'won',Lost:'lost',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'}[l]||'demo');
-function funnelTiles(){return D.funnel.map(f=>`<div class="fstage ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
+const stColor=l=>({Won:'won',Lost:'lost',Booked:'disc',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'}[l]||'demo');
+/* Funnel model: prepend a synthetic "Discovery Booked" (pre-qualified) tile — open deals
+   sitting in the Discovery stage that haven't had a Discovery call yet (no Gong call matched).
+   That's the pre-qualified intake where the pre-Discovery prep sheet drops. Those deals are
+   pulled OUT of Discovery Complete so counts don't double. Each tile rolls up where the system
+   is on entry-gates + required artifacts across the deals in that stage. */
+function funnelModel(){
+  const booked=D.deals.filter(d=>d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0);
+  const bset=new Set(booked.map(d=>d.id));
+  const sum=ds=>ds.reduce((s,d)=>s+(d.arr||d.amount||0),0);
+  const out=[{stage_id:'__booked',label:'Booked',full:'Discovery Booked',synthetic:true,deals:booked,n:booked.length,arr:sum(booked)}];
+  D.funnel.forEach(f=>{const ds=D.deals.filter(d=>d.stage_id===f.stage_id&&!bset.has(d.id));out.push(Object.assign({},f,{deals:ds,n:ds.length,arr:sum(ds)}));});
+  return out;
+}
+function gateProg(d){const cs=curStageObj(d);let g=0,a=0;(cs.items||[]).forEach(it=>{if(it.gate){g++;if(isCap(d.id,it.id)||((d.ai_fields||{})[it.id]&&d.ai_fields[it.id].value))a++;}});return {g,a};}
+function dealGatesDone(d){const p=gateProg(d);return p.g>0&&p.a>=p.g;}
+function dealArtifactsOnTrack(d){return !dealTasks(d.id).some(t=>!tStatus(d.id,t.id)&&t.urgency==='overdue');}
+function fRollup(f){
+  const CLOSED=['1090549670','1090549671'];
+  if(CLOSED.includes(f.stage_id)||!f.deals.length)return '';
+  const n=f.deals.length,parts=[];
+  if(f.stage_id!=='__booked'){const gd=f.deals.filter(dealGatesDone).length;parts.push(fRl('Gates',gd,n));}
+  const ad=f.deals.filter(dealArtifactsOnTrack).length;parts.push(fRl('Artifacts',ad,n));
+  return `<div class="frollup">${parts.join('')}</div>`;
+}
+function fRl(label,x,n){const st=x>=n?'ok':(x>0?'warn':'bad');return `<div class="frl ${st}"><span class="fk">${label}</span><span class="fv">${x}/${n}</span></div>`;}
+function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div>${fRollup(f)}</div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
   const up=D.upcoming.length?D.upcoming.map(u=>`<div class="up" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${u.deal_id?'Open deal':'New'}</div></div>`).join(''):'';
   let body='';
   if(filterStage){
-    const f=D.funnel.find(x=>x.stage_id===filterStage);const ds=D.deals.filter(d=>d.stage_id===filterStage);
-    body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div><div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
+    const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[]};const ds=f.deals;
+    const note=f.synthetic?'<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">Pre-qualified — Discovery booked, call not yet held. The agent drops the pre-Discovery prep sheet here.</div>':'';
+    body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div>${note}<div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
   }else{
     OPEN_ORDER.forEach(st=>{const ds=ods.filter(d=>d.stage===st);if(!ds.length)return;
       body+=`<div class="grp"><div class="grp-h"><span class="nm">${st}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div><div class="grid">${ds.map(dealCard).join('')}</div></div>`;});
@@ -415,6 +469,7 @@ function renderDeal(id){
      ${dcsBig(d)}</div>
    ${d.loss?`<div style="margin-top:14px">${lossPanel(d)}</div>`:''}
    ${statusBar(d,open)}
+   ${keyFactsCard(d)}
    <div class="sec-h"><span class="nm">What needs you</span><span class="ct">${open.length} open${resolved.length?` · ${resolved.length} resolved`:''}</span></div>
    ${open.length?`<div class="aq">${open.map(t=>actionCard(d,t)).join('')}</div>`:`<div class="allclear"><div class="big">✓ All clear</div>Nothing needs you on this deal right now. The agent is watching it and will surface the next step.</div>`}
    ${resolved.length?`<div class="resolved">${resolved.map(t=>resolvedRow(d,t)).join('')}</div>`:''}
@@ -546,6 +601,57 @@ function gateArtifact(d,t){
     +actsBar(d,t,[['Mark captured','done','primary']]);
 }
 
+/* ---- Key facts: the live deal record, kept current (Johnny's pre-Discovery key facts) ----
+   Value precedence: AE-confirmed (localStorage kf) > agent-extracted from Gong (ai_fields) > HubSpot.
+   Editing saves to the deal record now; HubSpot write-back turns on in Phase 3 (gated on Johnny's go). */
+const KEYFACTS=[
+  {k:'vertical',label:'Vertical',get:d=>d.industry,hint:'HubSpot industry_category — our live verticals'},
+  {k:'pd_field',label:'Field workers',ai:'pd_field',hint:'# frontline/deskless techs — drives the routing band'},
+  {k:'pd_size',label:'Company size',ai:'pd_size',get:d=>d.employees?d.employees+' employees':'',hint:'total headcount'},
+  {k:'pd_lms',label:'Current LMS',ai:'pd_lms',ai2:'d_tools',hint:'none / replacing / keeping (+ name)'},
+  {k:'contact',label:'Primary contact',get:d=>{const c=d.primary_contact||{};return c.name?c.name+(c.title?' · '+c.title:''):'';},hint:'champion + title'},
+  {k:'pd_whynow',label:'Why-now',ai:'pd_whynow',hint:'trigger driving the evaluation'},
+];
+function kfStore(id){return dst(id).kf||{};}
+function httpify(u){return /^https?:\/\//i.test(u)?u:'https://'+u;}
+function kfResolve(d,f){
+  const ov=kfStore(d.id)[f.k];
+  if(ov!=null&&ov!=='')return {val:ov,src:'you'};
+  const af=d.ai_fields||{};
+  if(f.ai&&af[f.ai]&&af[f.ai].value)return {val:af[f.ai].value,src:'gong',cite:af[f.ai].cite};
+  if(f.ai2&&af[f.ai2]&&af[f.ai2].value)return {val:af[f.ai2].value,src:'gong',cite:af[f.ai2].cite};
+  if(f.get){const g=f.get(d);if(g)return {val:g,src:'hubspot'};}
+  return {val:'',src:'none'};
+}
+function keyFactsCard(d){
+  const rows=KEYFACTS.map(f=>{
+    const r=kfResolve(d,f);
+    const tag={you:'<span class="kf-src you">✎ confirmed</span>',gong:'<span class="kf-src gong">from Gong</span>',hubspot:'<span class="kf-src hs">HubSpot</span>',none:''}[r.src]||'';
+    const link=f.k==='vertical'&&d.website?` <a class="lk" href="${esc(httpify(d.website))}" target="_blank">site ↗</a>`:'';
+    const cite=r.cite&&r.cite.gid?` <a class="lk" onclick="showCall('${d.id}','${r.cite.gid}',event)">${esc(r.cite.label||'source')}</a>`:'';
+    const val=r.val?esc(r.val):'<span class="kf-empty">not captured yet</span>';
+    return `<div class="kf-row" id="kf-${d.id}-${f.k}">
+      <div class="kf-l" title="${esc(f.hint)}">${f.label}</div>
+      <div class="kf-v">${val} ${tag}${link}${cite}</div>
+      <button class="kf-edit" title="Update — saves to the deal record" onclick="editKF('${d.id}','${f.k}')">✎</button></div>`;
+  }).join('');
+  const desc=d.company_desc?`<div class="kf-desc">${esc(d.company_desc.slice(0,280))}${d.company_desc.length>280?'…':''}</div>`:'';
+  return `<div class="keyfacts"><div class="kf-h"><b>Key facts</b><span class="kf-note">the live deal record · confirm a value to keep HubSpot current</span></div>
+    <div class="kf-grid">${rows}</div>${desc}</div>`;
+}
+function editKF(id,k){
+  const f=KEYFACTS.find(x=>x.k===k);const d=dealById(id);const r=kfResolve(d,f);
+  const row=document.getElementById('kf-'+id+'-'+k);if(!row)return;
+  const vc=row.querySelector('.kf-v');
+  vc.innerHTML=`<input class="kf-in" id="kfin-${id}-${k}" value="${esc(r.val||'')}"> <button class="btn sm primary" onclick="saveKF('${id}','${k}')">Save</button> <button class="btn sm ghost" onclick="renderDeal('${id}')">Cancel</button>`;
+  const inp=document.getElementById('kfin-'+id+'-'+k);if(inp){inp.focus();inp.onkeydown=e=>{if(e.key==='Enter')saveKF(id,k);if(e.key==='Escape')renderDeal(id);};}
+}
+function saveKF(id,k){
+  const inp=document.getElementById('kfin-'+id+'-'+k);if(!inp)return;
+  const s=dst(id);s.kf=s.kf||{};s.kf[k]=inp.value.trim();save(id,s);
+  toast('Saved to the deal record · HubSpot write-back turns on in Phase 3');renderDeal(id);
+}
+
 /* ---- collapsed facts & evidence ---- */
 function factsSection(d){
   return `<div class="facts-wrap">
@@ -587,6 +693,7 @@ function askReply(d,q){
   return core+note;
 }
 function dcsBig(d){const c=d.dcs.color,s=d.dcs.score;const col=c==='green'?'var(--green)':c==='yellow'?'var(--amber)':c==='red'?'var(--red)':'var(--faint)';const bg=c==='green'?'var(--green-bg)':c==='yellow'?'var(--amber-bg)':c==='red'?'var(--red-bg)':'var(--panel2)';
+  if(isWon(d))return `<div style="text-align:center"><div class="ring" style="background:var(--green-bg);color:var(--green);font-size:18px">Won</div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em">Closed</div></div>`;
   return `<div style="text-align:center"><div class="ring" style="background:${bg};color:${col}">${s==null?'—':s}</div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em">Confidence</div></div>`;}
 function stageSection(d,s,i){
   const open=!!openStages[d.id][s.key];const cur=s.key===d.rubric_stage;const pr=stageProg(d,s);
@@ -630,15 +737,24 @@ function setNote(id,k,v){const s=dst(id);s.notes[k]=v;save(id,s);}
 
 /* ---------- BANT Qualification Score ---------- */
 const BANT_FIELDS=[{id:'d_bant_b',label:'Budget',max:20},{id:'d_bant_a',label:'Authority',max:20},{id:'d_bant_n',label:'Need',max:40},{id:'d_bant_t',label:'Timeline',max:20}];
-function bantScore(id){let total=0,filled=0;BANT_FIELDS.forEach(f=>{const v=parseFloat(capVal(id,f.id));if(!isNaN(v)&&v>0){total+=v;filled++;}});return {total,filled,max:100};}
+/* Precedence: AE-confirmed (capVal) > agent-extracted from Gong (ai_fields) > unset. */
+function bantRaw(id,iid){
+  const c=capVal(id,iid);if(c!==''){const v=parseFloat(c);if(!isNaN(v))return {v,src:'you'};}
+  const d=dealById(id);const af=d&&d.ai_fields&&d.ai_fields[iid];
+  if(af&&af.value!=null&&af.value!==''){const v=parseFloat(af.value);if(!isNaN(v))return {v,src:'gong'};}
+  return {v:NaN,src:null};
+}
+function bantScore(id){let total=0,filled=0,ai=false;BANT_FIELDS.forEach(f=>{const r=bantRaw(id,f.id);if(!isNaN(r.v)&&r.v>0){total+=r.v;filled++;if(r.src==='gong')ai=true;}});return {total,filled,max:100,ai};}
 function updateBant(id){const el=document.getElementById('bant-'+id);if(el){const d=dealById(id);if(d)el.outerHTML=bantPanel(d);}}
 function bantPanel(d){
   const bs=bantScore(d.id);
-  const rows=BANT_FIELDS.map(f=>{const v=parseFloat(capVal(d.id,f.id))||0;const pct=Math.round(v/f.max*100);
-    return `<div class="bant-row"><div class="lab">${f.label}</div><div class="track"><i style="width:${pct}%"></i></div><div class="bv">${v}/${f.max}</div></div>`;}).join('');
-  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');const statusTxt=bs.filled===0?'Score BANT fields above':pass?'QUALIFIED':'BELOW THRESHOLD';
+  const rows=BANT_FIELDS.map(f=>{const r=bantRaw(d.id,f.id);const v=!isNaN(r.v)?r.v:0;const pct=Math.round(v/f.max*100);
+    const tag=r.src==='gong'?'<span class="kf-src gong" style="margin-left:6px">Gong</span>':'';
+    return `<div class="bant-row"><div class="lab">${f.label}${tag}</div><div class="track"><i style="width:${pct}%"></i></div><div class="bv">${v}/${f.max}</div></div>`;}).join('');
+  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');const statusTxt=bs.filled===0?'No BANT signal extracted yet':pass?'QUALIFIED':'BELOW THRESHOLD';
+  const src=bs.ai?'<span class="kf-note" style="display:block;margin-top:6px">Agent-extracted from Gong — accept the values in the Gate card to confirm.</span>':'';
   return `<div class="bant" id="bant-${d.id}"><h4>BANT Qualification<span class="score">${bs.filled?bs.total+'/100':'—'}</span></h4>${rows}
-    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div></div>`;
+    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div>${src}</div>`;
 }
 
 /* ---------- ROI Calculator ---------- */

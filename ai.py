@@ -77,8 +77,8 @@ def analyze_deal(deal, calls, emails, cache_dir, force=False):
 
     closed_lost = deal.get("bucket") == "closed_lost"
     calls_txt = "\n\n".join(
-        f"### CALL {c['id']} — {c.get('title','')} ({c.get('date','')[:10]})\n{c.get('transcript','')[:5000]}"
-        for c in calls[:3]) or "(no call transcripts available)"
+        f"### CALL {c['id']} — {c.get('title','')} ({c.get('date','')[:10]})\n{c.get('transcript','')[:4500]}"
+        for c in calls[:6]) or "(no call transcripts available)"
     emails_txt = "\n".join(
         f"- [{e.get('ts','')[:10]} {e.get('dir','')}] {e.get('subject','')}: {e.get('snippet','')[:140]}"
         for e in emails[-8:]) or "(no emails)"
@@ -103,7 +103,7 @@ Stakeholders seen: {stake_txt}
 RUBRIC — fill ALL `fields` you can determine from the evidence (value formatted per the item's type):
 {_rubric_prompt()}
 
-CALL TRANSCRIPTS (most recent first):
+CALL TRANSCRIPTS (chronological — earliest/discovery call first, latest last):
 {calls_txt}
 
 RECENT EMAILS:
@@ -118,7 +118,7 @@ Call deal_intelligence with:
 {"- loss: why this CLOSED-LOST deal was lost + one lesson." if closed_lost else ""}"""
 
     try:
-        msg = client().messages.create(model=MODEL, max_tokens=2600,
+        msg = client().messages.create(model=MODEL, max_tokens=8000,
             tools=[TOOL], tool_choice={"type":"tool","name":"deal_intelligence"},
             messages=[{"role":"user","content":prompt}])
         result = {}
