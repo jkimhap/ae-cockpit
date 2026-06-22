@@ -8,7 +8,7 @@
 
 Run:  quinn-os/.venv/bin/python3 serve.py     (or use ./run)
 """
-import json, os, sys, time, threading, urllib.parse
+import json, os, sys, time, threading, urllib.parse, gzip
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import load_env, CACHE_DIR
@@ -40,10 +40,24 @@ def cached_payload(rep):
         return assemble.assemble(rep, full=True)
 
 class H(BaseHTTPRequestHandler):
+    # HTTP/1.1 keep-alive: large responses (the ~830KB payload) transfer far more
+    # reliably across a Tailscale/LAN hop than HTTP/1.0's close-after-each-response.
+    # Safe because _send always sets an accurate Content-Length.
+    protocol_version = "HTTP/1.1"
+
     def _send(self, code, body, ctype="application/json"):
         b = body.encode() if isinstance(body, str) else body
+        # gzip when the client accepts it and the body is worth compressing.
+        # Shrinks the ~830KB JSON payload ~7x so it survives marginal links
+        # (e.g. an MTU-limited Wi-Fi/Tailscale path) and loads much faster.
+        enc = None
+        if len(b) > 1400 and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+            b = gzip.compress(b, 6); enc = "gzip"
         self.send_response(code)
         self.send_header("Content-Type", ctype)
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
