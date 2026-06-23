@@ -1227,17 +1227,18 @@ function dealCard(d){
 let filterStage=null;
 const stColor=l=>({Won:'won',Lost:'lost',Booked:'booked',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'}[l]||'demo');
 function dealStageColor(d){if(!d)return 'demo';if(d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0)return 'booked';return stColor(d.stage);}
-/* Funnel model: prepend a synthetic "Discovery Booked" (pre-qualified) tile — open deals
-   sitting in the Discovery stage that haven't had a Discovery call yet (no Gong call matched).
-   That's the pre-qualified intake where the pre-Discovery prep sheet drops. Those deals are
-   pulled OUT of Discovery Complete so counts don't double. Each tile rolls up where the system
-   is on entry-gates + required artifacts across the deals in that stage. */
+/* Funnel model: prepend a synthetic "Discovery Booked" tile = first calls that are BOOKED but
+   haven't happened yet (Johnny 2026-06-23). Those are the upcoming discovery meetings with no deal
+   in HubSpot yet — the deal is created at/after the call completes, so they're genuinely pre-deal.
+   The dealstage tiles below mirror HubSpot EXACTLY (no deals pulled out): a deal sits in HubSpot's
+   "Discovery Complete" stage iff its discovery is complete, even when Gong didn't match the call —
+   so the count matches HubSpot by construction (was: wrongly splitting on n_calls===0). Each
+   dealstage tile rolls up where the system is on entry-gates + required artifacts. */
 function funnelModel(){
-  const booked=D.deals.filter(d=>d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0);
-  const bset=new Set(booked.map(d=>d.id));
   const sum=ds=>ds.reduce((s,d)=>s+(d.arr||d.amount||0),0);
-  const out=[{stage_id:'__booked',label:'Booked',full:'Discovery Booked',synthetic:true,deals:booked,n:booked.length,arr:sum(booked)}];
-  D.funnel.forEach(f=>{const ds=D.deals.filter(d=>d.stage_id===f.stage_id&&!bset.has(d.id));out.push(Object.assign({},f,{deals:ds,n:ds.length,arr:sum(ds)}));});
+  const bookedMeetings=(D.upcoming||[]).filter(u=>!u.deal_id);   // no deal yet = booked, not held
+  const out=[{stage_id:'__booked',label:'Booked',full:'Discovery Booked',synthetic:true,meetings:bookedMeetings,deals:[],n:bookedMeetings.length,arr:0}];
+  D.funnel.forEach(f=>{const ds=D.deals.filter(d=>d.stage_id===f.stage_id);out.push(Object.assign({},f,{deals:ds,n:ds.length,arr:sum(ds)}));});
   return out;
 }
 function gateProg(d){const cs=curStageObj(d);let g=0,a=0;(cs.items||[]).forEach(it=>{if(it.gate){g++;if(isCap(d.id,it.id)||((d.ai_fields||{})[it.id]&&d.ai_fields[it.id].value))a++;}});return {g,a};}
@@ -1256,12 +1257,19 @@ function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synth
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
-  const up=D.upcoming.length?D.upcoming.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const col=dealStageColor(dd);return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${dd?esc(dd.stage):'New'}</div></div>`;}).join(''):'';
+  const up=D.upcoming.length?D.upcoming.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const who=dd?(dd.rubric_stage==='disc'?'Discovery Booked':esc(dd.stage)):'Discovery Booked';const col=(who==='Discovery Booked')?'booked':dealStageColor(dd);return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${who}</div></div>`;}).join(''):'';
   let body='';
   if(filterStage){
-    const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[]};const ds=f.deals;
-    const note=f.synthetic?'<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">Pre-qualified — Discovery booked, call not yet held. The agent drops the pre-Discovery prep sheet here.</div>':'';
-    body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div>${note}<div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
+    const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[],meetings:[]};
+    if(f.synthetic){
+      const ms=f.meetings||[];
+      const note='<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">First calls booked but not yet held — no HubSpot deal until the discovery call completes. The agent drops the pre-Discovery prep sheet here.</div>';
+      const rows=ms.map(u=>`<div class="up" style="border-left:4px solid var(--booked);background:var(--booked-bg)"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">Discovery Booked</div></div>`).join('')||'<div class="empty">No upcoming discovery calls booked.</div>';
+      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}<div class="up-row">${rows}</div></div>`;
+    }else{
+      const ds=f.deals;
+      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div><div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
+    }
   }else{
     // No stage selected (or just deselected): show NO deal cards. The funnel is the
     // navigator — click a stage box to reveal its deals. (Won/Lost are funnel tiles too.)
