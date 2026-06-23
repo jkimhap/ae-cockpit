@@ -820,10 +820,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Fraunces',Georgia,serif;
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}a{color:inherit}.tnum{font-variant-numeric:tabular-nums}
 input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#dcdad4;border-radius:8px;border:3px solid var(--bg)}
-.topbar{position:sticky;top:0;z-index:30;background:rgba(250,249,247,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 30px}
-.brand{display:flex;align-items:center;gap:9px}.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
-.brand b{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px;letter-spacing:-0.02em}.brand span{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
-.brand .who{margin-left:10px;padding-left:12px;border-left:1px solid var(--line2);font-size:13px;font-weight:600}
+.topbar{background:var(--bg);border-bottom:2px solid var(--ink);display:flex;align-items:flex-end;gap:14px;padding:26px 36px 12px;margin-bottom:22px}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand b{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:28px;letter-spacing:-0.5px;line-height:1}
+.hdr-right{display:flex;align-items:center;gap:10px}
 .sp{margin-left:auto}
 .engine{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 9px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line2);color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
 .engine .ed{width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -837,15 +837,29 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .grp{margin-top:26px}.grp-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
 .grp-h .nm{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .grp-h .ct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
-.funnel{display:grid;grid-template-columns:repeat(5,1fr) .82fr .82fr;gap:9px}
-@media(max-width:1100px){.funnel{grid-template-columns:repeat(4,1fr)}}
+/* Funnel = QuinnOS horizontal funnel: 5 full-height flow stages + 1 stacked
+   closed column (Won over Lost, each ~half height). Whole card tinted its stage
+   hue, dark ink border, arrows between open stages. (Johnny 2026-06-23.) */
+.funnel{display:grid;grid-template-columns:repeat(5,1fr) .82fr;gap:5px}
+@media(max-width:1100px){.funnel{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.funnel{grid-template-columns:repeat(2,1fr)}}
-.fstage{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;cursor:pointer;transition:.13s;position:relative;overflow:hidden}
-.fstage:hover{box-shadow:var(--shadow);transform:translateY(-1px)}.fstage.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.fstage.synthetic{border-style:dashed;background:var(--panel2)}
-.fstage .fb{position:absolute;left:0;top:0;height:4px;width:100%}
-.fstage .lab{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.fstage .n{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;letter-spacing:-0.02em;margin-top:6px}
-.fstage .arr{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:11px;margin-top:2px;font-weight:500}
+.fstage{position:relative;cursor:pointer;padding:15px 14px 13px;display:flex;flex-direction:column;justify-content:space-between;min-height:146px;border:1px solid var(--ink);border-radius:var(--radius);transition:transform .15s,box-shadow .15s}
+.fstage:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.fstage.sel{box-shadow:inset 0 0 0 3px var(--ink)}
+.fstage .stag{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:6px}
+.fstage .snm{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;line-height:1.1}
+.fstage .n{font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;line-height:1;letter-spacing:-0.02em}
+.fstage .nsub{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:3px}
+.fstage .arr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:7px}
+.fstage .arru{font-size:10px;font-weight:400;letter-spacing:.05em}
+.fstage .fa{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:8px solid var(--ink);z-index:5}
+.fstage.st-booked{background:var(--booked-bg)}.fstage.st-disc{background:var(--disc-bg)}.fstage.st-demo{background:var(--demo-bg)}.fstage.st-quote{background:var(--quote-bg)}.fstage.st-verbal{background:var(--verbal-bg)}.fstage.st-won{background:var(--won-bg)}.fstage.st-lost{background:var(--lost-bg)}
+.fstack{display:flex;flex-direction:column;gap:5px}
+.fstack .fstage{min-height:0;flex:1;padding:10px 13px;justify-content:center}
+.fstack .fstage .snm{font-size:13px}
+.fstack .fstage .n{font-size:22px;margin-top:2px}
+.fstack .fstage .nsub{display:none}
+.fstack .fstage .arr{margin-top:3px;font-size:10px}
 .frollup{margin-top:9px;display:flex;flex-direction:column;gap:3px}
 .frl{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px}
 .frl .fk{color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
@@ -1010,7 +1024,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}@keyframes sp{to{transform:rotate(360deg)}}
 .hide{display:none!important}
 /* ===== SalesOS two-pane shell (Phase 0) ===== */
-.shell{display:grid;grid-template-columns:1fr;align-items:stretch;min-height:calc(100vh - 53px)}
+.shell{display:grid;grid-template-columns:1fr;align-items:stretch;min-height:55vh}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.inbox{display:none}.inbox.mobile-on{display:flex}}
 .inbox{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);position:sticky;top:53px;height:calc(100vh - 53px);overflow:hidden}
 .inbox-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
@@ -1134,7 +1148,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .kf-in{flex:1;min-width:120px;border:1px solid var(--accent);border-radius:8px;padding:5px 9px;font-size:12.5px;outline:none}
 .kf-desc{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5}
 /* ===== Quinn OS top-level tab bar (server-rendered) ===== */
-.tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--ink);padding:0 30px;background:var(--bg);position:sticky;top:53px;z-index:25}
+.tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--ink);padding:0 36px;background:var(--bg);position:sticky;top:0;z-index:25;margin-bottom:6px}
 .tab{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;padding:10px 18px;border:1px solid var(--ink);border-bottom:none;background:var(--panel2);text-decoration:none;color:var(--ink);margin-right:-1px;cursor:pointer}
 .tab.active{background:var(--bg);position:relative;top:1px}
 /* ===== Dashboard / placeholder pages ===== */
@@ -1180,11 +1194,11 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 </style></head>
 <body>
 <header class="topbar">
-  <div class="brand"><b>Quinn SalesOS</b><span class="who" id="repName">…</span></div>
+  <div class="brand"><b>Quinn SalesOS</b></div>
   <span class="sp"></span>
-  <span class="engine none" id="engine">—</span><span class="refreshed" id="refreshed"></span>
+  <div class="hdr-right"><span class="engine none" id="engine">—</span><span class="refreshed" id="refreshed"></span>
   <button class="rfx" id="rbtn" onclick="refresh(false)">↻ Refresh</button>
-  <button class="rfx ghost" id="rfull" onclick="refresh(true)" title="Re-pull Gong + regenerate AI">⟳ Full sync</button>
+  <button class="rfx ghost" id="rfull" onclick="refresh(true)" title="Re-pull Gong + regenerate AI">⟳ Full sync</button></div>
 </header>
 __TAB_BAR__
 <div class="shell">
@@ -1233,7 +1247,7 @@ let refreshing=false;
 async function refresh(full,silent){if(refreshing)return;refreshing=true;$('#rbtn').disabled=true;$('#rfull').disabled=true;const o=$('#rbtn').textContent;$('#rbtn').textContent=full?'Full syncing…':'Refreshing…';
   try{const j=await fetchJSON('/api/refresh?rep='+REP+'&full='+(full?1:0),{method:'POST'});if(j.ok){D=j.payload;D.rubric.forEach(s=>s.items.forEach(it=>rubricById[it.id]=it));hydrate();route();if(!silent)toast((full?'Full sync':'Refreshed')+' · '+j.took+'s');}else toast('Refresh failed: '+(j.error||''));}
   catch(e){toast('Refresh failed');}finally{refreshing=false;$('#rbtn').disabled=false;$('#rfull').disabled=false;$('#rbtn').textContent=o;}}
-function hydrate(){$('#repName').textContent=D.rep;$('#refreshed').textContent='HubSpot '+ago(D.refreshed);
+function hydrate(){$('#refreshed').textContent='HubSpot '+ago(D.refreshed);
   const e=$('#engine');e.className='engine '+(D.ai_engine||'none');e.innerHTML='<span class="ed"></span>'+(D.ai_engine==='claude'?'Claude':D.ai_engine==='heuristic'?'Heuristic':'No AI');
   e.title=D.ai_engine==='heuristic'?'Anthropic key out of credits — add credits then Full sync to upgrade to Claude':'';
   }
@@ -1432,12 +1446,12 @@ function bookedTable(ms){
   }).join('')||`<tr><td colspan="${8+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl bookedtbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
-function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
+const moneyK=v=>{v=+v||0;return v>=1e6?'$'+(v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M':v>=1e3?'$'+Math.round(v/1e3)+'K':'$'+Math.round(v);};
+function fCard(f,opts){opts=opts||{};const col=stColor(f.label);const sel=filterStage===f.stage_id?' sel':'';const arr=f.synthetic?'':`<div class="arr tnum">${moneyK(f.arr)} <span class="arru">ARR</span></div>`;const nsub=f.synthetic?'booked':(f.n===1?'deal':'deals');return `<div class="fstage st-${col}${sel}" onclick="toggleFunnel('${f.stage_id}')"><div><div class="stag">${esc(opts.tag||'')}</div><div class="snm">${esc(f.full)}</div></div><div><div class="n tnum">${f.n}</div><div class="nsub">${nsub}</div>${arr}</div>${opts.arrow?'<div class="fa"></div>':''}</div>`;}
+function funnelTiles(){const m=funnelModel();const won=m.find(x=>x.stage_id==='1090549670');const lost=m.find(x=>x.stage_id==='1090549671');const flow=m.filter(x=>x.stage_id!=='1090549670'&&x.stage_id!=='1090549671');const tags=['Stage 1','Stage 2','Stage 3','Stage 4','Stage 5'];const flowHtml=flow.map((f,i)=>fCard(f,{tag:tags[i]||'',arrow:i<flow.length-1})).join('');const stack=`<div class="fstack">${won?fCard(won,{tag:'Won'}):''}${lost?fCard(lost,{tag:'Lost'}):''}</div>`;return flowHtml+stack;}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
-  const ups=(D.upcoming||[]).filter(u=>(u.deal_id||u.is_first)&&(!u.start||new Date(u.start).getTime()>=Date.now()));   // agenda = genuinely upcoming; just-held first calls live in the Discovery Booked tile, not here
-  const up=ups.length?ups.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const who=dd?(dd.rubric_stage==='disc'?'Discovery Booked':esc(dd.stage)):'Discovery Booked';const col=(who==='Discovery Booked')?'booked':dealStageColor(dd);const href=u.deal_id?`location.hash='#/deal/${u.deal_id}'`:`location.hash='#/deal/booked-${u.meeting_id}'`;return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${href}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${who}</div></div>`;}).join(''):'';
   let body='';
   if(filterStage){
     const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[],meetings:[]};
@@ -1455,8 +1469,7 @@ function renderMain(){
     body=`<div class="empty" style="margin-top:18px">Click a stage above to see its deals.</div>`;
   }
   v.innerHTML=`<div class="h1">Pipeline</div><div class="sub">${ods.length} open deals · ${money(ods.reduce((s,d)=>s+(d.arr||d.amount||0),0))} open pipeline</div>
-    ${up?`<div class="grp"><div class="grp-h"><span class="nm">Upcoming Meetings</span></div><div class="up-row">${up}</div></div>`:''}
-    <div class="grp"><div class="grp-h"><span class="nm">Funnel</span><span class="ct">${filterStage?'<a class="lk" onclick="toggleFunnel(null)">Clear filter</a>':'Click a stage to filter'}</span></div><div class="funnel">${funnelTiles()}</div></div>
+    <div class="grp"><div class="grp-h"><span class="nm">The Funnel</span><span class="ct">${filterStage?'<a class="lk" onclick="toggleFunnel(null)">Clear filter</a>':'Click a stage to filter the deals below'}</span></div><div class="funnel">${funnelTiles()}</div></div>
     ${body}`;
 }
 
