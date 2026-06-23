@@ -1,6 +1,21 @@
 """ui.py — the cockpit SPA. Stage-aware deal view with talk-track prompts,
 live ROI calculator, and BANT qualification scoring. Served by serve.py."""
 
+import json as _json, os as _os
+
+def _icp_tiers_json():
+    """The canonical ICP vertical→tier map (SKB derived/icp-tiers.json, v37+).
+    Injected into the table view so the Tier column stays in sync with the rubric.
+    Falls back to {} if the SKB isn't present on this host."""
+    for p in ("~/code/quinn/sales-knowledge-base/derived/icp-tiers.json",):
+        fp = _os.path.expanduser(p)
+        if _os.path.exists(fp):
+            try:
+                return _json.dumps(_json.load(open(fp)).get("tiers", {}))
+            except Exception:
+                pass
+    return "{}"
+
 def _tab_bar(active):
     """Server-rendered Quinn-OS top-level tab bar. `active` is one of
     'dashboard' | 'grant' | 'arlen' | 'ian'. Appears on every page."""
@@ -19,6 +34,7 @@ def html(rep, active=None):
     if active is None:
         active = rep if rep in ("grant", "arlen") else "grant"
     return (TEMPLATE.replace("__TAB_BAR__", _tab_bar(active))
+                    .replace("__ICP_TIERS__", _icp_tiers_json())
                     .replace("__REP__", rep))
 
 def _head():
@@ -843,6 +859,22 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .card .row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}.card .amt{font-weight:600;font-size:13.5px}
 .card .ctc{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.45}
 .card .prog{margin-top:11px}.card .alerts{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+.stbl{border-collapse:collapse;width:100%;font-size:12.5px;min-width:780px}
+.stbl thead th{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--panel2)}
+.stbl thead th.gcol{text-align:center;width:52px;color:var(--faint)}
+.stbl thead th.num{text-align:right}
+.stbl tbody td{padding:11px 12px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.stbl tbody tr{cursor:pointer;transition:.1s}.stbl tbody tr:hover{background:var(--accent-soft)}
+.stbl tbody tr:last-child td{border-bottom:none}
+.stbl .co{font-weight:600;font-size:13px;letter-spacing:-0.01em;line-height:1.25}
+.stbl .ctc{color:var(--faint);font-size:11px;margin-top:2px}
+.stbl .amt{font-weight:600;white-space:nowrap}
+.stbl td.num{font-family:'JetBrains Mono',monospace;color:var(--faint);text-align:right;white-space:nowrap}
+.stbl td.gc{text-align:center;font-size:14px}
+.stbl .gy{color:var(--green);font-weight:700}.stbl .gn{color:var(--line);font-weight:600}
+.tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.tier.t1{color:#fff;background:var(--green)}.tier.t2{color:#fff;background:var(--accent-ink)}.tier.t3{color:var(--ink);background:var(--amber-bg);border:1px solid var(--amber)}.tier.t4{color:var(--muted);background:var(--panel2);border:1px solid var(--line)}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;background:#fff;border:1px solid var(--line2);color:var(--muted)}
 .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .st-Discovery{color:var(--disc);background:var(--disc-bg);border-color:var(--disc-bg)}.st-Demo{color:var(--demo);background:var(--demo-bg);border-color:var(--demo-bg)}.st-Quote{color:var(--quote);background:var(--quote-bg);border-color:var(--quote-bg)}.st-Verbal{color:var(--verbal);background:var(--verbal-bg);border-color:var(--verbal-bg)}.st-Won{color:var(--won);background:var(--won-bg);border-color:var(--won-bg)}.st-Lost{color:var(--lost);background:var(--lost-bg);border-color:var(--lost-bg)}
@@ -1253,6 +1285,50 @@ function fRollup(f){
   return `<div class="frollup">${parts.join('')}</div>`;
 }
 function fRl(label,x,n){const st=x>=n?'ok':(x>0?'warn':'bad');return `<div class="frl ${st}"><span class="fk">${label}</span><span class="fv">${x}/${n}</span></div>`;}
+/* ---------- per-stage TABLE (replaces deal cards inside a selected stage) ----------
+   Columns: Company · Tier · Vertical · Value · Days since discovery · Days in stage ·
+   Contact, then one ✓/— column per ENTRY GATE of that stage (named from the SOP rubric).
+   Row click → the deal's full workspace.  NB: HubSpot industry_category is coarse, so Tier
+   is a best-effort crosswalk; the precise vertical/tier is Rita's job per SOP §B (nearest ICP
+   vertical from the company description) — unmapped industries show the raw vertical, Tier "—". */
+const ICP_TIERS=__ICP_TIERS__;
+const HS_TO_ICP={
+  FACILITIES_SERVICES:'Facilities Maintenance',
+  CONSTRUCTION:'General & Residential Construction',
+  MECHANICAL_OR_INDUSTRIAL_ENGINEERING:'Mechanical Construction',
+  HOSPITALITY:'Hospitality & Amusement',LEISURE_TRAVEL_TOURISM:'Hospitality & Amusement',EVENTS_SERVICES:'Hospitality & Amusement',
+  HOSPITAL_HEALTH_CARE:'Healthcare',PHARMACEUTICALS:'Healthcare',
+  MEDICAL_DEVICES:'Biomedical Equipment Service',
+  RESTAURANTS:'Food Service',FOOD_PRODUCTION:'Food Service',
+  LOGISTICS_AND_SUPPLY_CHAIN:'Warehousing, Logistics & Distribution',
+  SECURITY_AND_INVESTIGATIONS:'Security Guard Services',
+  OIL_ENERGY:'Energy with HVAC Team',UTILITIES:'Energy with HVAC Team',
+  MACHINERY:'Manufacturers & Distributors',ELECTRICAL_ELECTRONIC_MANUFACTURING:'Manufacturers & Distributors',
+  BUSINESS_SUPPLIES_AND_EQUIPMENT:'Manufacturers & Distributors',CONSUMER_GOODS:'Manufacturers & Distributors',
+  CONSUMER_ELECTRONICS:'Manufacturers & Distributors',FURNITURE:'Manufacturers & Distributors',
+  ONLINE_MEDIA:'SaaS'
+};
+const TIER_TAG={1:'T1 · PRIME',2:'T2 · OTHER',3:'T3 · DIST',4:"T4 · DON'T"};
+const STAGE_RUBRIC={'1090549665':'disc','1090549667':'roi','1104822108':'prop','1329839734':'prop','1090549670':'prop','1090549671':null};
+const GATE_SHORT={d_tools:'Tools',d_pain:'Pain',d_decision:'Decision',d_budget:'Budget',d_qualify:'Qualified',m_dm:'DM present',m_demo_delivered:'Demo',m_annual_cost:'$ Cost',m_scope:'Scope',m_next:'Next call',p_dm_present:'DM',p_obj:'Objections',p_price:'Pricing',p_arlen:'Arlen',p_commit:'Commit',p_onboard:'Onboard'};
+function titleCase(s){return String(s||'').toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
+function dealVertical(d){return HS_TO_ICP[d.industry]||(d.industry?titleCase(d.industry):'—');}
+function dealTier(d){const v=HS_TO_ICP[d.industry];return v?ICP_TIERS[v]:null;}
+function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="tier pending ICP-vertical mapping — Rita derives it per SOP §B">—</span>';return `<span class="tier t${t}" title="${esc(HS_TO_ICP[d.industry]||'')}">${TIER_TAG[t]}</span>`;}
+function daysSinceDisc(d){const cs=(d.timeline||[]).filter(e=>e.kind==='call').map(e=>e.ts).filter(Boolean).sort();if(!cs.length)return null;const t0=new Date(cs[0]).getTime();if(isNaN(t0))return null;return Math.max(0,Math.round((Date.now()-t0)/86400000));}
+function gateMet(d,iid){if(isCap(d.id,iid))return true;const af=d.ai_fields||{};return !!(af[iid]&&af[iid].value);}
+function stageGates(stage_id){const k=STAGE_RUBRIC[stage_id];if(!k)return [];const s=D.rubric.find(x=>x.key===k);return s?(s.items||[]).filter(it=>it.gate):[];}
+function stageTable(f){
+  const gates=stageGates(f.stage_id);
+  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Value</th><th class="num">Since disc.</th><th class="num">In stage</th><th>Contact</th>${gates.map(g=>`<th class="gcol" title="${esc(g.label)} — stage entry gate">${esc(GATE_SHORT[g.id]||g.label)}</th>`).join('')}</tr>`;
+  const rows=f.deals.map(d=>{
+    const c=d.primary_contact||{};const dd=daysSinceDisc(d);
+    const dis=(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—';
+    const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
+    return `<tr onclick="location.hash='#/deal/${d.id}'"><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num amt">${money(d.arr||d.amount)}</td><td class="num">${dd==null?'—':dd+'d'}</td><td class="num">${dis}</td><td>${contact}</td>${gates.map(g=>`<td class="gc">${gateMet(d,g.id)?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`).join('')}</tr>`;
+  }).join('')||`<tr><td colspan="${7+gates.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
+  return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+}
 function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
@@ -1268,7 +1344,7 @@ function renderMain(){
       body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}<div class="up-row">${rows}</div></div>`;
     }else{
       const ds=f.deals;
-      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))}</span></div><div class="grid">${ds.map(dealCard).join('')||'<div class="empty">No deals in this stage.</div>'}</div></div>`;
+      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))} · ✓ = stage entry gate met</span></div>${stageTable(f)}</div>`;
     }
   }else{
     // No stage selected (or just deselected): show NO deal cards. The funnel is the
