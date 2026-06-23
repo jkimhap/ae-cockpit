@@ -30,6 +30,150 @@ def _color(score):
     if score is None: return "gray"
     return "green" if score>=67 else ("yellow" if score>=40 else "red")
 
+# ================== BANT — computed by SalesOS from the transcript (SOP §2 rubric) ==========
+# The OLD path read the #gong-notifier contact props (bant_score/bant_raw_scores). That engine
+# is OUTDATED and being sunset (Johnny 2026-06-23). SalesOS now COMPUTES BANT itself from the
+# Gong discovery transcript via ai.score_bant() using the SOP rubric, and combines it with the
+# fit routing (tier / field-worker count / inbound) to recommend QUALIFY / DISQUALIFY.
+_NEED_SUBS = [("operational_pain","Operational Pain",20),("tech_stack","Tech Stack",10),
+              ("multi_location","Multi-Location",5),("compliance","Compliance",5)]
+
+def _fw_lower(band):
+    """Field-worker band ('101-500','2000+','25-50') -> lower-bound int."""
+    if not band: return None
+    m = re.search(r"\d+", str(band).replace(",",""))
+    return int(m.group()) if m else None
+
+def contact_enrich(cp):
+    """Booking-form fallback for # field workers + LMS (used when the transcript is silent)."""
+    cp = cp or {}
+    band = (cp.get("num_of_learners") or "").strip()
+    est  = (cp.get("frontline_workers_est") or "").strip()
+    which = (cp.get("which_lms_") or "").strip()
+    lv = (cp.get("lms") or "").strip().lower()
+    lms_yn = "yes" if lv in ("yes","true","y") else ("no" if lv in ("no","false","n","none") else ("yes" if which else ""))
+    return {"fw_band":band, "fw_est":est, "fw_lower":(_fw_lower(est) or _fw_lower(band)),
+            "lms":lms_yn, "which_lms":which}
+
+# Primary Source ("lead_source_custom") -> inbound/outbound, Johnny's EXACT mapping (2026-06-23).
+# Stored VALUES differ from labels: "Cold Call" -> "ZoomInfo". Anything unlisted -> unknown(None).
+_INBOUND_SRC = {"warm call","zoominfo","cold call","conference","field visit","cold outreach email",
+                "paid social","paid search","cold outreach linkedin","email marketing"}
+_OUTBOUND_SRC = {"referral","organic"}
+def _inbound(cp):
+    """inbound(True)/outbound(False)/unknown(None) from the Primary Source property."""
+    v = ((cp or {}).get("lead_source_custom") or "").strip().lower()
+    if not v: return None
+    if v in _INBOUND_SRC: return True
+    if v in _OUTBOUND_SRC: return False
+    return None
+
+def _tier_of(vertical):
+    """Vertical name -> ICP tier number (1-4) via the live icp-tiers map; None if unmatched."""
+    if not vertical: return None
+    return catz.TIERS.get(vertical) or catz.TIERS.get(str(vertical).strip())
+
+def _fit(tier, fw, emp, inbound, lms_has):
+    """Quinn-fit auto-check (Johnny 2026-06-23, locked ts1782249132):
+      T1 -> qualify (outbound is the motion; an inbound T1 also passes).
+      T2 -> only if INBOUND and (field workers >= 50  OR employees >= 100).
+      T3 -> only if INBOUND and (field workers >= 200 OR employees >= 500).
+      T4 -> always reject.
+    Also: <25 field workers with an entrenched LMS is a don't-sell floor.
+    Returns (ok True/False/None, reason)."""
+    active_lms = (lms_has == "yes")
+    if tier == 4: return False, "T4 vertical — don't-sell"
+    if fw is not None and fw < 25 and active_lms: return False, f"{fw} field workers (<25) + active LMS"
+    if tier == 1: return True, "T1 vertical"
+    if tier in (2, 3):
+        if inbound is not True: return False, f"T{tier} requires inbound (only T1 sells outbound)"
+        bar_fw, bar_emp = (50, 100) if tier == 2 else (200, 500)
+        size_ok = (fw is not None and fw >= bar_fw) or (emp is not None and emp >= bar_emp)
+        if size_ok: return True, f"T{tier} inbound, size OK (FW {fw or '?'} / emp {emp or '?'} vs FW≥{bar_fw} or emp≥{bar_emp})"
+        if fw is None and emp is None: return None, f"T{tier} inbound — size unknown, confirm on the call"
+        return False, f"T{tier} inbound but below size bar (need FW≥{bar_fw} or emp≥{bar_emp})"
+    if tier is None and fw is None and emp is None: return None, "Vertical & size unknown — confirm on the call"
+    return True, "Meets fit floor"
+
+def _recommend(total, floors_ok, floor_fail, tier, fw, emp, inbound, lms_has):
+    """SOP §2 qualify/disqualify routing: fit gates first, then the BANT gate. Returns
+    (rec, reason, flags)."""
+    flags = []
+    fit_ok, fit_reason = _fit(tier, fw, emp, inbound, lms_has)
+    if fit_ok is False:
+        return "DISQUALIFY", f"Fit: {fit_reason}.", flags
+    if fw is not None and fw > 250:
+        flags.append("Notify @arlen (>250 field workers) — deal stays with the booking AE")
+    if not floors_ok:
+        return "DISQUALIFY", "BANT floor not met: " + ", ".join(floor_fail) + ".", flags
+    if total is not None and total >= 50:
+        return "QUALIFY", f"BANT {total} ≥ 50, floors met" + (f"; {fit_reason}" if fit_ok else "") + ".", flags
+    return "DISQUALIFY", f"BANT {total} < 50.", flags
+
+def build_scorecard(raw, tier, tier_label, enrich, inbound, emp=None):
+    """Turn ai.score_bant() output into the rich scorecard ui.py renders. None if no score.
+    `emp` = company employee count (HubSpot numberofemployees) — the alternative size bar
+    for the T2/T3 fit gate (FW>=N OR employees>=M)."""
+    if not raw or raw.get("engine") == "error":
+        return None
+    def comp(d):
+        # Tolerate the model returning a {score,rationale,quote} dict, a bare number,
+        # a plain string rationale, or nothing — never raise (a single malformed AI
+        # component must not crash the whole sync).
+        if isinstance(d, dict):
+            try: s = int(d.get("score") or 0)
+            except (TypeError, ValueError): s = 0
+            return s, (d.get("rationale") or "").strip(), (d.get("quote") or "").strip()
+        if isinstance(d, bool):  return 0, "", ""
+        if isinstance(d, (int, float)): return int(d), "", ""
+        if isinstance(d, str):   return 0, d.strip(), ""
+        return 0, "", ""
+    bV,bW,bQ = comp(raw.get("budget"))
+    aV,aW,aQ = comp(raw.get("authority"))
+    tV,tW,tQ = comp(raw.get("timeline"))
+    need_raw = raw.get("need")
+    need = need_raw if isinstance(need_raw, dict) else {}
+    need_str = need_raw.strip() if isinstance(need_raw, str) else ""
+    subs = []
+    need_total = 0
+    for key,label,mx in _NEED_SUBS:
+        v,w,q = comp(need.get(key))
+        v = max(0, min(mx, v)); need_total += v
+        subs.append({"k":label,"v":v,"max":mx,"why":w,"quote":q})
+    bV=max(0,min(20,bV)); aV=max(0,min(20,aV)); tV=max(0,min(20,tV))
+    total = bV + aV + need_total + tV
+    floor_fail = []
+    if bV < 10: floor_fail.append("Budget ≥ 10")
+    if aV < 10: floor_fail.append("Authority ≥ 10")
+    if need_total < 20: floor_fail.append("Need ≥ 20")
+    if tV < 10: floor_fail.append("Timeline ≥ 10")
+    floors_ok = not floor_fail
+    # field workers: transcript training-scope count preferred; else booking-form band
+    fw = raw.get("field_workers")
+    fw = int(fw) if isinstance(fw,(int,float)) else None
+    fw_note = (raw.get("field_workers_note") or "").strip()
+    if fw is None:
+        fw = (enrich or {}).get("fw_lower"); fw_note = "booking form" if fw else ""
+    lms_has = raw.get("lms_has") or ((enrich or {}).get("lms") or "unknown") or "unknown"
+    if lms_has not in ("yes","no","unknown"): lms_has = "unknown"
+    lms_which = (raw.get("lms_which") or (enrich or {}).get("which_lms") or "").strip()
+    emp = int(emp) if isinstance(emp, (int, float)) else None
+    rec, reason, flags = _recommend(total, floors_ok, floor_fail, tier, fw, emp, inbound, lms_has)
+    fit_ok, fit_reason = _fit(tier, fw, emp, inbound, lms_has)
+    items = [
+        {"k":"Budget","v":bV,"max":20,"why":bW,"quote":bQ},
+        {"k":"Authority","v":aV,"max":20,"why":aW,"quote":aQ},
+        {"k":"Need","v":need_total,"max":40,"why":(need.get("summary","") or need_str),"quote":"","subs":subs},
+        {"k":"Timeline","v":tV,"max":20,"why":tW,"quote":tQ},
+    ]
+    return {"total":total,"rec":rec,"rec_reason":reason,"flags":flags,
+            "tier":tier_label or ("T"+str(tier) if tier else ""),"items":items,
+            "floors_ok":floors_ok,"floor_fail":floor_fail,
+            "field_workers":fw,"fw_note":fw_note,"lms_has":lms_has,"lms_which":lms_which,
+            "fit_ok":fit_ok,"fit_reason":fit_reason,
+            "summary":(raw.get("summary") or "").strip(),
+            "source":"salesos-rubric","rubric_version":raw.get("rubric_version","")}
+
 def _cache(name):
     os.makedirs(CACHE_DIR, exist_ok=True)
     return os.path.join(CACHE_DIR, name)
@@ -79,13 +223,21 @@ def assemble(rep, full=True, log=print):
     log(f"HubSpot: {len(deal_objs)} deals, {len(contacts)} contacts, {len(emails)} emails, {len(meetings)} meetings")
 
     # ---- Gong (fresh or cached) ----
-    gong_by_deal = _load(f"gong-{rep}.json", {})   # {deal_id: [call meta]}
-    tx_for_ai = {}                                  # {call_id: transcript} (only when full)
-    call_parties = {}                               # {call_id: [parties]}
+    # dom2call maps EVERY external call's domain -> [call meta], so a booked first-call with no
+    # deal yet can still find its discovery transcript by the contact's email domain. tx_for_ai
+    # (labeled transcripts) is persisted so BANT survives a fast refresh — ai.score_bant() then
+    # cache-hits on its rubric signature instead of re-pulling Gong or re-calling Claude.
+    gong_by_deal = _load(f"gong-{rep}.json", {})    # {deal_id: [call meta]}
+    tx_for_ai    = {}                                # {call_id: labeled transcript}
+    call_parties = {}                                # {call_id: [parties]}
+    dom2call     = {}                                # {domain: [call meta]} — ALL external calls
+    call_meta_by_id = {}                             # {call_id: raw gong call} — full sync only
+                                                     # (own name: the deal loop reuses `cmeta` as a list)
     if full:
         log("Gong: pulling fresh calls…")
         uid = gong.find_user(owner["email"]) or gong.find_user(f"{rep}@meetquinn.ai")
         calls = gong.calls_for_user(uid, days=180) if uid else []
+        call_meta_by_id = {str(c.get('metaData',c).get('id')): c for c in calls}
         # domain -> deal_ids
         dom2deal = {}
         for d in deal_objs:
@@ -97,35 +249,39 @@ def assemble(rep, full=True, log=print):
         for c in calls:
             md = c.get("metaData", c); cid = str(md.get("id"))
             doms = gong.external_domains(c)
-            hit = set()
-            for dm in doms:
-                for did in dom2deal.get(dm, []): hit.add(did)
-            if not hit: continue
-            call_parties[cid] = gong.external_parties(c)
             meta = {"id":cid, "title":md.get("title",""), "date":(md.get("started") or "")[:19],
                     "duration_min": round((md.get("duration") or 0)/60) or None,
                     "url": md.get("url") or GONG_URL.format(cid)}
+            call_parties[cid] = gong.external_parties(c)
+            for dm in doms:
+                dom2call.setdefault(dm, []).append(meta)
+            hit = set()
+            for dm in doms:
+                for did in dom2deal.get(dm, []): hit.add(did)
             for did in hit:
                 gong_by_deal.setdefault(did, []).append(meta)
                 matched_call_ids.setdefault(did, []).append(cid)
         json.dump(gong_by_deal, open(_cache(f"gong-{rep}.json"),"w"))
         json.dump(call_parties, open(_cache(f"gongparties-{rep}.json"),"w"))
-        # transcripts only for deals we'll analyze (open + closed_lost), up to 3 recent calls each
-        want = []
+        json.dump(dom2call, open(_cache(f"dom2call-{rep}.json"),"w"))
+        # transcripts for every call on an OPEN deal we'll BANT-score (Johnny: score the live
+        # pipeline only, exclude Closed Won/Lost). The earliest is the discovery call BANT reads.
+        # Booked-lead transcripts are pulled below (we don't know the booked first-calls until
+        # the meeting pass). tx_for_ai persists at end.
+        want = set()
         for d in deal_objs:
             b = stages[d["properties"]["dealstage"]]
-            is_lost = b["closed"] and not b["won"]
-            if (not b["closed"]) or is_lost:
-                want += matched_call_ids.get(d["id"], [])[:3]
+            if not b["closed"]:
+                want.update(matched_call_ids.get(d["id"], []))
         if want:
-            log(f"Gong: transcripts for {len(set(want))} calls…")
-            raw = gong.transcripts(list(set(want)))
-            # rebuild labeled text using parties from the matched calls
-            cmeta = {str(c.get('metaData',c).get('id')): c for c in calls}
+            log(f"Gong: transcripts for {len(want)} deal calls…")
+            raw = gong.transcripts(list(want))
             for cid, seg in raw.items():
-                tx_for_ai[cid] = gong.labeled_text(cmeta.get(cid, {}), seg)
+                tx_for_ai[cid] = gong.labeled_text(call_meta_by_id.get(cid, {}), seg)
     else:
+        tx_for_ai    = _load(f"gongtx-{rep}.json", {})
         call_parties = _load(f"gongparties-{rep}.json", {})
+        dom2call     = _load(f"dom2call-{rep}.json", {})
 
     # ---- build deals ----
     deals = []
@@ -161,6 +317,39 @@ def assemble(rep, full=True, log=print):
         co_domain = (co.get("domain") or "").lower()
         co_name = co.get("name") or _name_from(p.get("dealname"))
         vinf = _infer_vertical(co_domain, did, co_name, full) if not vertical_quinn else {}
+        vertical = vertical_quinn or (vinf or {}).get("vertical") or ""
+        deal_tier = _tier_of(vertical)
+        deal_tier_label = catz.TIER_LABELS.get(str(deal_tier), "") if deal_tier else ""
+
+        # ---- BANT: computed from the DISCOVERY (earliest) Gong transcript via the SOP §2 rubric.
+        # Not the #gong-notifier props. enrich = booking-form fallback for FW/LMS; inbound from
+        # the Primary Source property. Recommendation fuses BANT floors + fit routing.
+        deal_enrich = None
+        for cid in a_ct.get(did, []):
+            cpp = contacts.get(cid, {})
+            if cpp.get("num_of_learners") or cpp.get("lms") or cpp.get("which_lms_") or cpp.get("frontline_workers_est"):
+                deal_enrich = contact_enrich(cpp); break
+        if deal_enrich is None and a_ct.get(did):
+            deal_enrich = contact_enrich(contacts.get(a_ct[did][0], {}))
+        inbound_cp = None
+        for cid in a_ct.get(did, []):
+            if (contacts.get(cid, {}) or {}).get("lead_source_custom"): inbound_cp = contacts.get(cid, {}); break
+        if inbound_cp is None and a_ct.get(did):
+            inbound_cp = contacts.get(a_ct[did][0], {})
+        deal_inbound = _inbound(inbound_cp)
+        cmetas = gong_by_deal.get(did, [])
+        disc = min(cmetas, key=lambda c: c.get("date") or "9999") if cmetas else None
+        disc_tx = tx_for_ai.get(disc["id"], "") if disc else ""
+        deal_bant = None
+        if disc_tx:
+            bant_ctx = {"company":co_name,"employees":_num(co.get("numberofemployees")),
+                        "contact_title":(primary.get("title","") if primary else ""),
+                        "vertical":vertical,"tier":deal_tier}
+            try:
+                raw_bant = ai.score_bant(disc_tx, bant_ctx, CACHE_DIR, f"deal-{did}", force=False)
+                deal_bant = build_scorecard(raw_bant, deal_tier, deal_tier_label, deal_enrich, deal_inbound, _num(co.get("numberofemployees")))
+            except Exception as ex:
+                log(f"BANT scoring failed for deal {did}: {ex}"); deal_bant = None
 
         # emails
         elist = []
@@ -204,10 +393,12 @@ def assemble(rep, full=True, log=print):
         deal = {"id":did,"company":co.get("name") or _name_from(p.get("dealname")),
                 "stage_id":sid,"stage":short,"stage_full":label,"bucket":bucket,"rank":order[sid],
                 "amount":_num(p.get("amount")),"arr":_num(p.get("amount")),
+                "closedate":p.get("closedate") or "",
                 "source":(p.get("hs_analytics_source_data_1") or p.get("hs_analytics_source") or "—"),
                 "dealtype":p.get("dealtype") or "newbusiness",
                 "industry":co.get("industry_category") or co.get("industry") or "","vertical_quinn":vertical_quinn,
-                "vertical_inferred":(vinf or {}).get("vertical") or "","vertical_inferred_meta":vinf or {},"employees":_num(co.get("numberofemployees")),
+                "vertical_inferred":(vinf or {}).get("vertical") or "","vertical_inferred_meta":vinf or {},
+                "tier":deal_tier,"tier_label":deal_tier_label,"employees":_num(co.get("numberofemployees")),
                 "locations":co.get("numberoflocations") or "","icp":"",
                 "company_desc":co.get("description") or "","website":co.get("website") or "",
                 "company_linkedin":co.get("linkedin_company_page") or "",
@@ -219,6 +410,7 @@ def assemble(rep, full=True, log=print):
                        "baseline":BASELINE,"n_calls":len(calls),"n_emails":len(elist)},
                 "hubspot_url":f"https://app.hubspot.com/contacts/deals/{did}",
                 "is_open":is_open,"rubric_stage":rubric.HS_TO_STAGE.get(sid,"disc"),
+                "bant":deal_bant,"enrich":deal_enrich,"inbound":deal_inbound,
                 "ai_fields":{},"ai_next_steps":[],"ai_engine":None,"alerts":[]}
         deals.append((deal, d))
 
@@ -290,6 +482,27 @@ def assemble(rep, full=True, log=print):
     m2company = hs.assoc("meetings","companies",first_mids) if first_mids else {}
     f_contacts = hs.contacts_for(sorted({c for v in m2contact.values() for c in v})) if m2contact else {}
     f_companies = hs.companies_for(sorted({c for v in m2company.values() for c in v})) if m2company else {}
+    # Booked-lead BANT: match each booked first-call to a Gong call by the contact's email
+    # DOMAIN, take the earliest (the discovery call). Pull those transcripts so score_bant runs.
+    lead_call = {}   # meeting_id -> chosen call meta
+    for mid in first_mids:
+        cids = m2contact.get(mid, [])
+        cp = f_contacts.get(cids[0], {}) if cids else {}
+        if not isinstance(cp, dict):
+            log(f"  booked-lead {mid}: contact {cids[0] if cids else '?'} props not a dict ({type(cp).__name__}) — skipping")
+            cp = {}
+        email = (cp.get("email") or "")
+        dom = email.split("@")[-1].lower() if "@" in email else ""
+        cand = dom2call.get(dom, []) if dom else []
+        if cand:
+            lead_call[mid] = min(cand, key=lambda c: c.get("date") or "9999")
+    if full and lead_call:
+        need = [m["id"] for m in lead_call.values() if m["id"] not in tx_for_ai]
+        if need:
+            log(f"Gong: transcripts for {len(set(need))} booked-lead calls…")
+            raw = gong.transcripts(list(set(need)))
+            for cid, seg in raw.items():
+                tx_for_ai[cid] = gong.labeled_text(call_meta_by_id.get(cid, {}), seg)
     for m in raw_mtgs:
         mp = m["properties"]
         mid = str(m.get("id",""))
@@ -309,17 +522,23 @@ def assemble(rep, full=True, log=print):
         e = {"title":title,"start":start,
              "meeting_id":mid,"is_first":bool(is_first),
              "contact":"","contact_title":"","company":(by_id[did]["company"] if did in by_id else _clean_mtg_title(title)),
-             "employees":"","num_of_learners":"","lms":"",
+             "employees":"","num_of_learners":"","lms":"","which_lms":"","fw_est":"",
              "vertical_quinn":"","vertical":"","vertical_meta":{},"tier":"",
+             "bant":None,"enrich":None,"inbound":None,"bant_tier":"",
              "deal_id":did}
         if is_first and not did:
             cids = m2contact.get(mid, []); coids = m2company.get(mid, [])
             cp = f_contacts.get(cids[0], {}) if cids else {}
             co = f_companies.get(coids[0], {}) if coids else {}
+            if not isinstance(cp, dict): cp = {}
+            if not isinstance(co, dict): co = {}
             e["contact"] = ((cp.get("firstname") or "")+" "+(cp.get("lastname") or "")).strip()
             e["contact_title"] = cp.get("jobtitle","") or ""
             e["num_of_learners"] = cp.get("num_of_learners","") or ""
             e["lms"] = cp.get("which_lms_") or cp.get("lms") or ""
+            en = contact_enrich(cp)
+            e["enrich"] = en; e["which_lms"] = en["which_lms"]; e["fw_est"] = en["fw_est"]
+            e["inbound"] = _inbound(cp)
             if co.get("name"): e["company"] = co.get("name")
             e["employees"] = co.get("numberofemployees") or ""
             # Vertical/tier source mirrors the deal path: the CONTACT "Industry (Quinn)"
@@ -340,9 +559,29 @@ def assemble(rep, full=True, log=print):
                 e["vertical"] = (vinf or {}).get("vertical") or ""
                 e["vertical_meta"] = vinf or {}
                 e["tier"] = (vinf or {}).get("tier") or ""
+            # BANT — computed from the discovery transcript (matched by contact domain), SOP §2.
+            lead_vertical = e["vertical_quinn"] or e["vertical"] or ""
+            lead_tier = _tier_of(lead_vertical)
+            lead_tier_label = catz.TIER_LABELS.get(str(lead_tier), "") if lead_tier else ""
+            e["tier"] = e["tier"] or lead_tier or ""
+            meta = lead_call.get(mid)
+            disc_tx = tx_for_ai.get(meta["id"], "") if meta else ""
+            if disc_tx:
+                bant_ctx = {"company":e["company"],"employees":(_num(co.get("numberofemployees")) or ""),
+                            "contact_title":e["contact_title"],"vertical":lead_vertical,"tier":lead_tier}
+                try:
+                    raw_bant = ai.score_bant(disc_tx, bant_ctx, CACHE_DIR, f"lead-{mid}", force=False)
+                    e["bant"] = build_scorecard(raw_bant, lead_tier, lead_tier_label, en, e["inbound"], _num(co.get("numberofemployees")))
+                except Exception as ex:
+                    log(f"BANT scoring failed for lead {mid}: {ex}"); e["bant"] = None
+            e["bant_tier"] = (e["bant"] or {}).get("tier","") or lead_tier_label
         up.append(e)
     up.sort(key=lambda x: x["start"])
     up = up[:200]   # one rep's meetings; raised from 30 so the 60-day booked look-back isn't truncated
+    # Persist transcripts (deal + booked-lead) so a fast refresh keeps BANT — score_bant
+    # cache-hits on the rubric signature instead of re-pulling Gong or re-calling Claude.
+    if full:
+        json.dump(tx_for_ai, open(_cache(f"gongtx-{rep}.json"),"w"))
 
     funnel = []
     for sid in sorted(stage_ids, key=lambda s: order[s]):

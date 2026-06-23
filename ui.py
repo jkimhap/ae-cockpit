@@ -812,8 +812,11 @@ TEMPLATE = r"""<!doctype html>
 --core:#3a6a3a;--core-bg:#d4e4cb;
 --green:#3a6a3a;--green-bg:#d4e4cb;--amber:#8a6300;--amber-bg:#f4eedd;--red:#b42318;--red-bg:#fbeae9;
 --shadow-sm:none;--shadow:0 1px 0 rgba(43,43,43,.04);
---radius:4px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#0f8aa3;--demo-bg:#e1f1f5;--quote:#8a6300;--quote-bg:#f4eedd;
---verbal:#b5179e;--verbal-bg:#f7e4f3;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
+/* Stage hues = EXACT QuinnOS cockpit RGBs (build_cockpit.py :root). Fixes disc/verbal/lost
+   all reading as similar pinks: verbal is now indigo, lost crimson, disc violet — distinct.
+   Booked has no QuinnOS equivalent (QuinnOS funnel starts at Discovery) → calm slate. */
+--radius:4px;--booked:#475569;--booked-bg:#eef2f7;--disc:#6d28d9;--disc-bg:#efe9fb;--demo:#0369a1;--demo-bg:#e3f1fa;--quote:#b45309;--quote-bg:#fbf0db;
+--verbal:#4338ca;--verbal-bg:#e7e8fc;--won:#15803d;--won-bg:#e7f4ec;--lost:#9f1239;--lost-bg:#fbe9ec;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Fraunces',Georgia,serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-0.004em}
 .tnum,.ktag,.kf-src,.engtag,.tbadge,.kf-l{font-family:'JetBrains Mono',monospace}
@@ -915,13 +918,18 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .step .au{font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--green);background:var(--green-bg);padding:1px 6px;border-radius:4px;margin-left:8px;vertical-align:middle;text-transform:uppercase}
 .alldone{margin-top:12px;padding:12px 14px;font-size:13px;color:var(--won);font-weight:600;background:var(--won-bg);border-radius:8px}
 .prepcard{margin-top:22px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);overflow:hidden}
-.prepcard .ph{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:13px 16px;border-bottom:1px solid var(--line)}
+.prepcard .ph{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.prepcard:not([open]) .ph{border-bottom:none}
+.prepcard .ph:hover{color:var(--ink)}
+.prepcard .phscore{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0}
 .prepcard .pb{padding:15px 16px}
 .prepcard .blk{margin-bottom:15px}
 .prepcard .blk:last-child{margin-bottom:0}
 .prepcard .bh{font-size:11px;font-weight:700;color:var(--ink);margin-bottom:7px;letter-spacing:.02em;text-transform:uppercase}
 .prepcard ul{margin:0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.65}
-.prepcard .who{font-size:13px;color:var(--muted)}
+.prepcard .who{font-size:13px;color:var(--muted);line-height:1.6}
+.prepcard .dropmail{white-space:pre-wrap;font-size:12.5px;color:var(--muted);background:rgba(0,0,0,.14);border:1px solid var(--line);border-radius:8px;padding:11px 13px;line-height:1.55;font-family:inherit;margin:0;overflow-x:auto}
+.prepcard .draftnote{font-size:11.5px;color:var(--faint);margin-top:7px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;background:#fff;border:1px solid var(--line2);color:var(--muted)}
 .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .st-Discovery{color:var(--disc);background:var(--disc-bg);border-color:var(--disc-bg)}.st-Demo{color:var(--demo);background:var(--demo-bg);border-color:var(--demo-bg)}.st-Quote{color:var(--quote);background:var(--quote-bg);border-color:var(--quote-bg)}.st-Verbal{color:var(--verbal);background:var(--verbal-bg);border-color:var(--verbal-bg)}.st-Won{color:var(--won);background:var(--won-bg);border-color:var(--won-bg)}.st-Lost{color:var(--lost);background:var(--lost-bg);border-color:var(--lost-bg)}
@@ -987,6 +995,43 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .bant-row .bv{font-size:12px;font-weight:600;color:var(--disc);text-align:right;font-variant-numeric:tabular-nums}
 .bant .threshold{margin-top:10px;padding-top:10px;border-top:1px solid rgba(110,89,192,.2);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
 .bant .threshold .status{font-weight:700;font-size:12px}.bant .threshold .status.pass{color:var(--green)}.bant .threshold .status.fail{color:var(--red)}
+/* BANT — full lead-scored rubric (gong-notifier scorecard on the HubSpot contact) */
+.bant-rec{display:flex;align-items:center;gap:8px;margin:2px 0 13px;padding:8px 11px;border-radius:8px;font-size:12.5px;font-weight:700;letter-spacing:.02em}
+.bant-rec.qualify{background:var(--won-bg);color:var(--won);border:1px solid var(--won)}
+.bant-rec.disqualify{background:var(--lost-bg);color:var(--lost);border:1px solid var(--lost)}
+.bant-rec.neutral{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.bant-rec .rtier{margin-left:auto;font-weight:600;font-size:11px;font-family:monospace;text-transform:uppercase;letter-spacing:.04em;opacity:.85}
+.bant-item{padding:9px 0;border-top:1px solid rgba(110,89,192,.13)}
+.bant-item:first-of-type{border-top:none;padding-top:2px}
+.bant-item-h{display:grid;grid-template-columns:78px 1fr 46px;align-items:center;gap:9px}
+.bant-item-h .lab{font-size:12px;font-weight:600;color:var(--disc)}
+.bant-item-h .track{height:7px;background:rgba(110,89,192,.15);border-radius:4px;overflow:hidden}
+.bant-item-h .track i{display:block;height:100%;border-radius:4px;background:var(--disc);transition:.3s}
+.bant-item-h .bv{font-size:12px;font-weight:700;color:var(--disc);text-align:right;font-variant-numeric:tabular-nums}
+.bant-why{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:5px;white-space:pre-wrap}
+.bant-next{margin-top:11px;padding-top:10px;border-top:1px solid rgba(110,89,192,.2);font-size:11.5px;color:var(--muted);line-height:1.5;white-space:pre-wrap}
+.bant-next b{color:var(--disc);display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:700}
+.bant-src{margin-top:9px;font-size:10px;color:var(--faint);font-style:italic}
+/* BANT — SOP rubric clean table (scores + subscores + rationale) */
+.bant-reason{font-size:11.5px;color:var(--ink);line-height:1.5;margin:-7px 0 12px;font-weight:500}
+.bant-flag{font-size:11px;color:var(--quote);background:var(--quote-bg);border:1px solid var(--quote);border-radius:6px;padding:5px 9px;margin:0 0 10px;font-weight:600;display:flex;gap:6px;align-items:center}
+.bant-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:11px}
+.bant-tbl th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:0 8px 6px 0;border-bottom:1px solid rgba(110,89,192,.22)}
+.bant-tbl th.num{text-align:right;width:52px}
+.bant-tbl td{padding:7px 8px 7px 0;border-bottom:1px solid rgba(110,89,192,.1);vertical-align:top;line-height:1.45}
+.bant-tbl td.bc{font-weight:600;color:var(--disc);white-space:nowrap}
+.bant-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:var(--disc);white-space:nowrap}
+.bant-tbl tr.need td{border-bottom:none}
+.bant-tbl tr.sub td{padding-top:3px;padding-bottom:3px;border-bottom:none}
+.bant-tbl tr.sub td.bc{font-weight:500;color:var(--muted);padding-left:12px}
+.bant-tbl tr.sub td.num{font-weight:600;color:var(--muted)}
+.bant-tbl tr.sub:last-of-type td{border-bottom:1px solid rgba(110,89,192,.1);padding-bottom:7px}
+.bant-tbl tr.flr td{font-weight:700}.bant-tbl tr.flr.bad td.num{color:var(--lost)}.bant-tbl tr.flr.bad td.bc{color:var(--lost)}
+.bant-rat{color:var(--muted)}
+.bant-quote{display:block;color:var(--faint);font-style:italic;margin-top:3px}
+.bant-facts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--muted);padding:9px 0 4px;border-top:1px solid rgba(110,89,192,.2)}
+.bant-facts b{color:var(--ink);font-weight:600}
+.bant-facts .ok{color:var(--won);font-weight:700}.bant-facts .no{color:var(--lost);font-weight:700}
 /* ROI calc */
 .roi{margin-top:14px;background:linear-gradient(135deg,#f8fffe,#f3f8fc);border:1px solid var(--demo);border-radius:10px;padding:18px 17px}
 .roi h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--demo);margin-bottom:4px;display:flex;align-items:center;gap:8px}
@@ -1230,7 +1275,9 @@ function bookedDeal(id){
     employees:u.employees||'',source:'Meetings link',
     primary_contact:{name:u.contact||'',title:u.contact_title||''},
     stakeholders:u.contact?[{name:u.contact,title:u.contact_title||''}]:[],
-    hubspot_url:'',timeline:[],ai_fields:{},dcs:null,loss:null,
+    hubspot_url:'',timeline:[],ai_fields:{},dcs:null,loss:null,closedate:'',
+    bant:u.bant||null,enrich:u.enrich||null,inbound:(typeof u.inbound==='boolean'?u.inbound:null),
+    tier:(u.tier!=null?u.tier:null),tier_label:u.bant_tier||'',
     meeting_start:u.start,num_of_learners:u.num_of_learners||'',lms:u.lms||''};
 }
 const fmtDate=s=>{if(!s)return '';const d=new Date(s);return isNaN(d)?String(s).slice(0,10):d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
@@ -1253,7 +1300,7 @@ function hydrate(){$('#refreshed').textContent='HubSpot '+ago(D.refreshed);
   }
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2600);}
 window.addEventListener('hashchange',route);
-function route(){if(!D)return;const h=location.hash||'#/';if(h.startsWith('#/deal/'))renderDeal(h.slice(7));else renderMain();window.scrollTo(0,0);}
+function route(){if(!D)return;const h=location.hash||'#/';if(h.startsWith('#/deal/'))renderDeal(h.slice(7));else if(h.startsWith('#/stage/')){filterStage=h.slice(8);renderMain();}else renderMain();window.scrollTo(0,0);}
 
 /* ---------- LEFT PANE: SalesOS Task Inbox (Phase 0, heuristic) ----------
    Tasks are derived server-side in tasks.py from the current deal snapshot
@@ -1411,15 +1458,44 @@ function discoveryDate(d){
 function daysSinceDisc(d){const dt=discoveryDate(d);if(!dt)return null;const t0=new Date(dt).getTime();if(isNaN(t0))return null;return Math.max(0,Math.round((Date.now()-t0)/86400000));}
 function gateMet(d,iid){if(isCap(d.id,iid))return true;const af=d.ai_fields||{};return !!(af[iid]&&af[iid].value);}
 function stageGates(stage_id){const k=STAGE_RUBRIC[stage_id];if(!k)return [];const s=D.rubric.find(x=>x.key===k);return s?(s.items||[]).filter(it=>it.gate):[];}
+/* Per-stage table columns = THIS stage's SOP exit checklist (the same steps the deal-detail
+   row shows), not generic entry gates (Johnny 2026-06-23). Won/Lost collapse "Since disc" +
+   "In stage" into one "Since close" (# days since close date). */
+function stageStepKey(stage_id){return ({'1090549665':'disc_complete','1090549667':'demo','1104822108':'quote','1329839734':'verbal','1090549670':'won','1090549671':'lost'})[String(stage_id)]||'disc_complete';}
+function stageCols(sk){return ((STAGE_STEPS[sk]||{}).steps||[]).filter(s=>s.col);}
+/* FW / LMS / BANT cell values — transcript-derived (from the scored BANT) preferred, since Rita
+   refines these every time she analyzes a new call; fall back to the booking-form band. */
+function fwOf(d){
+  if(d.bant&&d.bant.field_workers!=null)return String(d.bant.field_workers);
+  if(d.num_of_learners)return String(d.num_of_learners);
+  return '—';
+}
+function lmsOf(d){
+  const b=d.bant&&d.bant.lms_has;
+  if(b==='yes')return 'Yes'; if(b==='no')return 'No';
+  if(d.lms&&String(d.lms).trim()){const v=String(d.lms).trim().toLowerCase();return (v==='no'||v==='none'||v==='n'||v==='false')?'No':'Yes';}
+  return '—';
+}
+function bantTag(d){const b=d.bant;if(!b||b.total==null)return '—';const t=b.total;const col=t>=50?'var(--won)':'var(--lost)';return `<b style="color:${col};font-variant-numeric:tabular-nums">${t}</b>`;}
+function daysSinceClose(d){if(!d.closedate)return null;const t=new Date(d.closedate).getTime();if(isNaN(t))return null;return Math.max(0,Math.round((Date.now()-t)/86400000));}
 function stageTable(f){
-  const gates=stageGates(f.stage_id);
-  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Deal Size</th><th class="num">Since disc.</th><th class="num">In stage</th><th>Contact</th>${gates.map(g=>`<th class="gcol" title="${esc(g.label)} — stage entry gate">${esc(GATE_SHORT[g.id]||g.label)}</th>`).join('')}</tr>`;
+  const sk=stageStepKey(f.stage_id);const cols=stageCols(sk);const closed=(sk==='won'||sk==='lost');
+  const isDisc=(sk==='disc_complete');
+  const nextLab=(STAGE_STEPS[sk]||{}).next;
+  const colTitle=s=>esc(s.lb)+' — '+(nextLab?('exit to '+nextLab):'closed-stage')+' step';
+  const timeHead=closed?'<th class="num">Since close</th>':'<th class="num">Since disc.</th><th class="num">In stage</th>';
+  const bantHead=isDisc?'<th class="num" title="BANT score from the Gong discovery transcript (SOP §2 rubric)">BANT</th>':'';
+  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th>${bantHead}<th class="num">Deal Size</th>${timeHead}<th>Contact</th>${cols.map(s=>`<th class="gcol" title="${colTitle(s)}">${esc(s.col)}</th>`).join('')}</tr>`;
   const rows=f.deals.map(d=>{
-    const c=d.primary_contact||{};const dd=daysSinceDisc(d);
-    const dis=(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—';
+    const c=d.primary_contact||{};
     const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
-    return `<tr onclick="location.hash='#/deal/${d.id}'"><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num amt">${money(d.arr||d.amount)}</td><td class="num">${dd==null?'—':dd+'d'}</td><td class="num">${dis}</td><td>${contact}</td>${gates.map(g=>`<td class="gc">${gateMet(d,g.id)?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`).join('')}</tr>`;
-  }).join('')||`<tr><td colspan="${7+gates.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
+    let timeCells;
+    if(closed){const dc=daysSinceClose(d);timeCells=`<td class="num">${dc==null?'—':dc+'d'}</td>`;}
+    else{const dd=daysSinceDisc(d);const dis=(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—';timeCells=`<td class="num">${dd==null?'—':dd+'d'}</td><td class="num">${dis}</td>`;}
+    const gc=cols.map(s=>{const dn=stepDone(d,s);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
+    const bantCell=isDisc?`<td class="num">${bantTag(d)}</td>`:'';
+    return `<tr onclick="location.hash='#/deal/${d.id}'"><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${esc(fwOf(d))}</td><td>${esc(lmsOf(d))}</td>${bantCell}<td class="num amt">${money(d.arr||d.amount)}</td>${timeCells}<td>${contact}</td>${gc}</tr>`;
+  }).join('')||`<tr><td colspan="${(closed?8:9)+(isDisc?1:0)+cols.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 /* Discovery Booked enrichment table: first calls booked but not yet held. Same look as
@@ -1432,13 +1508,13 @@ function stageTable(f){
 const BOOKED_COLS=[['disc_done','Call done?'],['bant','BANT + rec?'],['demo_booked','Next call?'],['fit','Quinn fit?']];
 function bookedStepByK(k){return STAGE_STEPS.booked.steps.find(s=>s.k===k);}
 function bookedTable(ms){
-  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Field workers</th><th>Uses software</th><th class="num">Employees</th><th>Contact</th>${BOOKED_COLS.map(([k,lb])=>`<th class="gcol" title="${esc((bookedStepByK(k)||{}).lb||lb)} — Discovery Booked exit check">${lb}</th>`).join('')}</tr>`;
+  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th><th class="num">Employees</th><th>Contact</th>${BOOKED_COLS.map(([k,lb])=>`<th class="gcol" title="${esc((bookedStepByK(k)||{}).lb||lb)} — Discovery Booked exit check">${lb}</th>`).join('')}</tr>`;
   const now=Date.now();
   const rows=ms.map(u=>{const d=bookedDeal('booked-'+u.meeting_id);if(!d)return '';
     const c=d.primary_contact||{};
     const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
-    const lw=d.num_of_learners?esc(String(d.num_of_learners)):'—';
-    const sw=d.lms?esc(String(d.lms)):'—';
+    const lw=esc(fwOf(d));
+    const sw=esc(lmsOf(d));
     const emp=d.employees?esc(String(d.employees)):'—';
     const past=u.start&&new Date(u.start).getTime()<now;
     const gc=BOOKED_COLS.map(([k])=>{const st=bookedStepByK(k);const dn=st&&stepDone(d,st);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
@@ -1461,7 +1537,7 @@ function renderMain(){
       body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}${bookedTable(ms)}</div>`;
     }else{
       const ds=f.deals;
-      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))} · ✓ = stage entry gate met</span></div>${stageTable(f)}</div>`;
+      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))} · ✓ = exit step done</span></div>${stageTable(f)}</div>`;
     }
   }else{
     // No stage selected (or just deselected): show NO deal cards. The funnel is the
@@ -1490,43 +1566,43 @@ const STAGE_STEPS={
     {k:'fit',lb:'Quinn fit re-confirmed',sub:'Vertical/tier holds; not <25 field workers with an entrenched LMS'}
   ]},
   disc_complete:{next:'Demo Complete & ROI Validated',steps:[
-    {k:'recap',lb:'Post-Discovery recap email sent',sub:'Thank-you + pains in their words + next step + source-material ask',auto:d=>hasOutEmail(d)},
-    {k:'source',lb:'Source material received from prospect',sub:'The inputs Ahri needs to build the custom course'},
-    {k:'jira',lb:'Jira form submitted to Ahri',sub:'AE submits the LCC form → Ahri builds the custom course'},
-    {k:'ahri',lb:'Ahri returns the custom course',sub:'Course in hand ≥ 24h before the Demo'},
+    {k:'demo_booked',col:'Demo booked',lb:'Demo (next) call booked',sub:'Another call on the calendar with the company',auto:d=>hasFutureMeeting(d)},
+    {k:'recap',col:'Recap sent',lb:'Post-Discovery recap email sent',sub:'Thank-you + pains in their words + next step + source-material ask',auto:d=>hasOutEmail(d)},
+    {k:'source',col:'Source material in',lb:'Source material received from prospect',sub:'The inputs Ahri needs to build the custom course'},
+    {k:'jira',col:'Jira to Ahri',lb:'Jira / LCC form submitted to Ahri',sub:'AE submits the LCC form → Ahri builds the custom course'},
+    {k:'ahri',col:'Course ready',lb:'Ahri returned the custom course',sub:'Course in hand ≥ 24h before the Demo'},
     {k:'predemo',lb:'Pre-Demo prep sheet ready',sub:'Demo flow, new stakeholders, high-context ROI questions'}
   ]},
   demo:{next:'Quote Sent',steps:[
-    {k:'demo_recap',lb:'Demo / ROI recap email sent'},
-    {k:'roi',lb:'Champion-agreed ROI number on record',sub:'ROI validated with the buyer — the value gate'},
-    {k:'deck',lb:'Proposal deck approved',sub:'Arlen-approved with pricing baked in (skipped on Arlen-owned deals)'},
-    {k:'prop_booked',lb:'Proposal call booked',auto:d=>hasFutureMeeting(d)},
+    {k:'prop_booked',col:'Proposal booked',lb:'Proposal call booked',sub:'Next call on the calendar',auto:d=>hasFutureMeeting(d)},
+    {k:'demo_recap',col:'Recap sent',lb:'Demo / ROI recap email sent'},
+    {k:'roi',col:'ROI Agreed',lb:'Champion-agreed ROI number on record',sub:'ROI validated with the buyer — the value gate'},
+    {k:'deck',col:'Deck approved',lb:'Proposal deck approved',sub:'Arlen-approved with pricing baked in (skipped on Arlen-owned deals)'},
+    {k:'prop_completed',col:'Proposal call completed',lb:'Proposal call completed',sub:'Walked the buyer through the proposal'},
+    {k:'quote_built',col:'Quote built',lb:'Quote built in HubSpot',sub:'AE-built, ready for approval'},
+    {k:'quote_approved',col:'Quote approved',lb:'Quote approved by Arlen',sub:'Non-standard items reviewed + approved'},
     {k:'preprop',lb:'Pre-Proposal-call prep sheet ready'}
   ]},
   quote:{next:'Verbal Commit',steps:[
-    {k:'prop_summary',lb:'Proposal-call summary logged'},
-    {k:'quote_built',lb:'Quote built in HubSpot',sub:'AE-approved'},
-    {k:'nonstd',lb:'Non-standard items reviewed by Arlen'},
-    {k:'quote_sent',lb:'Quote sent to the buyer',sub:'The AE sends — never the operator'},
+    {k:'quote_sent',col:'Quote sent',lb:'Quote sent to the buyer',sub:'The AE sends — never the operator'},
+    {k:'followup',col:'Follow up sent',lb:'Follow-up sent after the quote',sub:'Chase for a decision; keep the deal warm'},
     {k:'redlines',lb:'Redlines / contract negotiation handled'}
   ]},
   verbal:{next:'Closed Won',steps:[
-    {k:'agreement',lb:'Agreement sent (same day)'},
-    {k:'concessions',lb:'Predictable concessions pre-cleared',sub:'Arlen-approved'},
-    {k:'csm',lb:'CSM intro + onboarding kickoff started in parallel'},
-    {k:'legal',lb:'Legal-review SLA tracked + weekly chase'},
-    {k:'terms',lb:'Current-terms artifact kept up to date'}
+    {k:'agreement',col:'Contract sent',lb:'Contract / agreement sent (same day)'},
+    {k:'concessions',col:'Concessions cleared',lb:'Predictable concessions pre-cleared',sub:'Arlen-approved'},
+    {k:'handoff',col:'Handoff approved',lb:'CSM handoff doc approved',sub:'Onboarding starts in parallel'},
+    {k:'welcome',col:'Welcome sent',lb:'Welcome email sent'},
+    {k:'kickoff',col:'Kickoff set',lb:'Onboarding kickoff scheduled'},
+    {k:'legal',lb:'Legal-review SLA tracked + weekly chase'}
   ]},
   won:{next:null,steps:[
-    {k:'handoff',lb:'CSM handoff doc sent + accepted'},
-    {k:'welcome',lb:'Welcome email sent'},
-    {k:'kickoff',lb:'Onboarding kickoff scheduled'},
-    {k:'exec',lb:'Executed agreement returned + filed'},
-    {k:'upsell',lb:'Upsell / expansion monitoring on'}
+    {k:'upsell',col:'Upsell oppty',lb:'Upsell / expansion opportunity flagged'},
+    {k:'exec',lb:'Executed agreement returned + filed'}
   ]},
   lost:{next:null,steps:[
-    {k:'reason',lb:'Loss reason code + narrative logged',sub:'AE-accepted',auto:d=>!!d.loss},
-    {k:'revival',lb:'Revival watch scheduled (~2 months out)',sub:'Unless killed-for-fit'}
+    {k:'reason',col:'Loss context logged',lb:'Loss reason code + narrative logged',sub:'AE-accepted',auto:d=>!!d.loss},
+    {k:'revival',col:'Revisited?',lb:'Revisited / revival watch',sub:'~2 months out unless killed-for-fit'}
   ]}
 };
 function stepStage(d){
@@ -1564,6 +1640,108 @@ function prepBlock(d){
     <div class="blk"><div class="bh">The gate to clear</div><ul><li>Leave with winnability proven — BANT ≥ 50: real operational problem, why-now, a champion, a path to the economic buyer, and the next call booked.</li></ul></div>
   </div></details>`;
 }
+/* ===== Per-stage "meaty" dropdowns — collapsible Discovery-Prep (tan) cards under the
+   checklist. Each holds the SOP content that belongs in SalesOS for that stage: prep sheets,
+   recap / follow-up / welcome drafts, ROI talk track, loss analysis. The AE checks the gates
+   in the checklist above; these give them the material to clear each gate. SalesOS drafts,
+   the human sends — nothing is ever auto-sent. ===== */
+function drop(id,title,score,bodyHtml,open){
+  return `<details class="prepcard"${open?' open':''} id="${id}"><summary class="ph">${esc(title)}${score?`<span class="phscore"> · ${esc(score)}</span>`:''}</summary><div class="pb">${bodyHtml}</div></details>`;
+}
+function mailBox(txt){return `<pre class="dropmail">${esc(txt)}</pre>`;}
+function welcomeText(d){const f=firstName(d);
+  return `Subject: Welcome to Quinn, ${d.company}!\n\nHi ${f},\n\nThrilled to have ${d.company} on board. Here's what happens next:\n\n• Your CS lead reaches out within 1 business day to confirm kickoff\n• We finalize the rollout plan for your field team\n• Your tailored courses are ready to ship from day one\n\nThanks for trusting us with your team's training — let's get your people productive faster.\n\nBest,\n${D.rep}`;}
+function recapDrop(d){
+  const sent=hasOutEmail(d);
+  const status=sent
+    ?`<div class="blk"><div class="bh">Status</div><div class="who">✓ A post-discovery recap has already gone out — the draft below is the SalesOS reference copy. The sent email lives in HubSpot.</div></div>`
+    :`<div class="blk"><div class="bh">Status</div><div class="who">⚑ No recap email detected yet. Draft is ready — edit and send from your own inbox (SalesOS never auto-sends).</div></div>`;
+  const body=`${status}<div class="blk"><div class="bh">Recap email${sent?'':' — draft'}</div>${mailBox(followupText(d))}<div class="draftnote">Send within 24h of the call. Reconfirm the agreed next step + date so the demo stays booked.</div></div>`;
+  return drop('recap-'+d.id,'Post-discovery recap email'+(sent?' — sent':' — draft'),'',body,false);
+}
+function preDemoDrop(d){
+  const ctx=[esc(dealVertical(d)), d.num_of_learners?esc(String(d.num_of_learners))+' field workers':'Field-worker count TBD', d.employees?d.employees+' employees':'Headcount unknown'].join(' · ');
+  const body=`<div class="blk"><div class="bh">Build the demo around</div><ul>
+    <li>The specific operational pain named in discovery — open on the cost of the status quo, not features</li>
+    <li>A course built from <b>their own</b> source material (the Jira/LCC output Ahri returns)</li>
+    <li>How it lands for field workers in the flow of work, on mobile</li></ul></div>
+    <div class="blk"><div class="bh">Confirm before you demo</div><ul>
+    <li>Source material received and the Jira/LCC form submitted to Ahri</li>
+    <li>Ahri returned the custom course and it's QA'd</li>
+    <li>Economic buyer in the room — or a clear, agreed path to them</li></ul></div>
+    <div class="blk"><div class="bh">Context</div><div class="who">${ctx}</div></div>`;
+  return drop('predemo-'+d.id,'Pre-demo prep sheet','',body,false);
+}
+function prePropDrop(d){
+  const body=`<div class="blk"><div class="bh">Proposal-call game plan</div><ul>
+    <li>Re-anchor on the ROI you agreed in the demo — lead with their number, not list price</li>
+    <li>Walk the deck top-down: problem → tailored course → rollout → price</li>
+    <li>Get explicit deck approval and ROI agreement before you build the quote</li></ul></div>
+    <div class="blk"><div class="bh">Have ready</div><ul>
+    <li>Quote built and Arlen-approved</li>
+    <li>Mutual close plan with dates</li>
+    <li>Answers to the top 2 objections you heard on the demo</li></ul></div>`;
+  return drop('preprop-'+d.id,'Pre-proposal prep sheet','',body,false);
+}
+function roiDrop(d){
+  const body=`<div class="blk"><div class="bh">ROI talk track</div><ul>
+    <li>Anchor on ramp time: weeks-to-productive today vs. with Quinn × fully-loaded tech cost</li>
+    <li>Tie to their pain — turnover, compliance risk, supervisor time lost to training</li>
+    <li>Land one defensible number they repeat back to you — that's "ROI Agreed"</li></ul></div>
+    <div class="blk"><div class="bh">Use the ROI calculator</div><div class="who">Put a dollar figure behind the story on this deal before the proposal call.</div></div>`;
+  return drop('roi-'+d.id,'ROI agreement — talk track','',body,false);
+}
+function quoteFollowupDrop(d){
+  const body=`<div class="blk"><div class="bh">Status</div><div class="who">Quote is out. Stay on it — a quote with no follow-up is how live deals go quiet.</div></div>
+    <div class="blk"><div class="bh">Follow-up email — draft</div>${mailBox(followupText(d))}<div class="draftnote">Follow up within 48h. Reconfirm the agreed price, what's included, and the decision date.</div></div>`;
+  return drop('qfollow-'+d.id,'Quote follow-up email — draft','',body,false);
+}
+function redlinesDrop(d){
+  const body=`<div class="blk"><div class="bh">Negotiation guardrails</div><ul>
+    <li>Trade concessions, never give them — every discount buys a faster close date or a longer term</li>
+    <li>Loop Arlen before agreeing to anything off the standard quote</li>
+    <li>Log every concession so the CS handoff is clean</li></ul></div>`;
+  return drop('redlines-'+d.id,'Redlines & concessions','',body,false);
+}
+function handoffDrop(d){
+  const body=`<div class="blk"><div class="bh">Before you mark verbal won</div><ul>
+    <li>Contract sent and concessions cleared with Arlen</li>
+    <li>CS handoff approved — populate the handoff doc (champion, goals, gotchas, agreed ROI)</li>
+    <li>Kickoff date set with the customer</li></ul></div>`;
+  return drop('handoff-'+d.id,'CS handoff checklist','',body,false);
+}
+function welcomeDrop(d){
+  const body=`<div class="blk"><div class="bh">Welcome email — draft</div>${mailBox(welcomeText(d))}<div class="draftnote">Send the moment the contract is signed — it sets the tone and locks the kickoff.</div></div>`;
+  return drop('welcome-'+d.id,'Welcome email — draft','',body,false);
+}
+function upsellDrop(d){
+  const body=`<div class="blk"><div class="bh">Closed-won — watch for expansion</div><ul>
+    <li>More field-worker seats as they roll out beyond the pilot team</li>
+    <li>Adjacent roles / locations once the first cohort shows results</li>
+    <li>Flag the upsell oppty to CS so it's owned, not dropped</li></ul></div>`;
+  return drop('upsell-'+d.id,'Upsell opportunity watch','',body,false);
+}
+function lossDrop(d){
+  const reason=d.loss?esc(String(d.loss)):'Not logged yet — capture why this died.';
+  const body=`<div class="blk"><div class="bh">Loss context</div><div class="who">${reason}</div></div>
+    <div class="blk"><div class="bh">Revival plan</div><ul>
+    <li>Lost on timing/budget (not fit) → revisit in ~2 months</li>
+    <li>Killed for fit (Tier-4 / no real field-worker training need) → close it for good, don't re-work it</li>
+    <li>Note the trigger that would make this worth re-opening</li></ul></div>`;
+  return drop('loss-'+d.id,'Loss analysis & revival','',body,false);
+}
+function stageDropdowns(d,sk){
+  const out=[];
+  if(sk==='booked'){out.push(prepBlock(d));out.push(bantPanel(d));}
+  else if(sk==='disc_complete'){out.push(bantPanel(d));out.push(recapDrop(d));out.push(preDemoDrop(d));}
+  else if(sk==='demo'){out.push(bantPanel(d));out.push(prePropDrop(d));out.push(roiDrop(d));}
+  else if(sk==='quote'){out.push(bantPanel(d));out.push(quoteFollowupDrop(d));out.push(redlinesDrop(d));}
+  else if(sk==='verbal'){out.push(bantPanel(d));out.push(handoffDrop(d));out.push(welcomeDrop(d));}
+  else if(sk==='won'){out.push(welcomeDrop(d));out.push(upsellDrop(d));}
+  else if(sk==='lost'){out.push(lossDrop(d));out.push(bantPanel(d));}
+  else{out.push(bantPanel(d));}
+  return out.join('');
+}
 function renderDeal(id){
   const d=dealById(id);const v=$('#view');if(!d){v.innerHTML='<div class="empty">Deal not found.</div>';return;}
   const sk=stepStage(d);const cfg=STAGE_STEPS[sk]||STAGE_STEPS.disc_complete;
@@ -1584,7 +1762,7 @@ function renderDeal(id){
     <div class="path-h"><span class="t">${cfg.next?'Path to '+esc(cfg.next):'Close-out checklist'}</span><span class="pr">${doneN} of ${tot} done</span></div>
     <div class="steps">${rows}</div>
     ${allDone&&cfg.next?`<div class="alldone">✓ All steps clear — ready to advance to ${esc(cfg.next)}.</div>`:''}
-    ${sk==='booked'?prepBlock(d)+bantPanel(d):''}`;
+    ${stageDropdowns(d,sk)}`;
 }
 
 /* ===== Task-centric workspace engine (Phase 1) =====
@@ -1853,17 +2031,80 @@ function bantRaw(id,iid){
   if(af&&af.value!=null&&af.value!==''){const v=parseFloat(af.value);if(!isNaN(v))return {v,src:'gong'};}
   return {v:NaN,src:null};
 }
-function bantScore(id){let total=0,filled=0,ai=false;BANT_FIELDS.forEach(f=>{const r=bantRaw(id,f.id);if(!isNaN(r.v)&&r.v>0){total+=r.v;filled++;if(r.src==='gong')ai=true;}});return {total,filled,max:100,ai};}
+/* bantScore: prefer the SalesOS rubric scorecard (d.bant) — computed from the Gong discovery
+   transcript via the SOP §2 rubric (assemble.build_scorecard). Fall back to the older
+   deal-scoped AI fields only when no scorecard exists. */
+function bantScore(id){
+  const d=dealById(id);const cb=d&&d.bant;
+  if(cb){
+    const items=cb.items||[];
+    const total=cb.total!=null?cb.total:items.reduce((s,it)=>s+(+it.v||0),0);
+    const filled=items.filter(it=>it.v!=null).length||(cb.total!=null?1:0);
+    return {total,filled,max:100,ai:true,contact:true,rec:cb.rec||''};
+  }
+  let total=0,filled=0,ai=false;BANT_FIELDS.forEach(f=>{const r=bantRaw(id,f.id);if(!isNaN(r.v)&&r.v>0){total+=r.v;filled++;if(r.src==='gong')ai=true;}});
+  return {total,filled,max:100,ai,contact:false,rec:''};
+}
 function updateBant(id){const el=document.getElementById('bant-'+id);if(el){const d=dealById(id);if(d)el.outerHTML=bantPanel(d);}}
+/* Full SOP BANT rubric: scores + Need subscores + rationale + verbatim quote per component,
+   plus the qualify/disqualify recommendation (BANT floors fused with the fit routing). */
 function bantPanel(d){
+  const cb=d.bant;
+  if(cb&&((cb.items&&cb.items.length)||cb.total!=null))return bantPanelContact(d,cb);
+  return bantPanelDeal(d);
+}
+function bantPanelContact(d,cb){
+  const total=cb.total!=null?cb.total:(cb.items||[]).reduce((s,it)=>s+(+it.v||0),0);
+  const rec=(cb.rec||'').toUpperCase();
+  const recCls=rec==='QUALIFY'?'qualify':rec==='DISQUALIFY'?'disqualify':'neutral';
+  const recTxt=rec==='QUALIFY'?'✓ QUALIFY':rec==='DISQUALIFY'?'✕ DISQUALIFY':'Recommendation pending';
+  const tierBit=cb.tier?`<span class="rtier">${esc(cb.tier)}</span>`:'';
+  const q=s=>{s=(s||'').trim();if(!s)return '';if(s.length>140)s=s.slice(0,138)+'…';return `<span class="bant-quote">“${esc(s)}”</span>`;};
+  const rows=(cb.items||[]).map(it=>{
+    const max=it.max||({Budget:20,Authority:20,Need:40,Timeline:20}[it.k]||20);
+    const v=it.v!=null?it.v:0;
+    if(it.subs&&it.subs.length){
+      let h=`<tr class="need"><td class="bc">${esc(it.k)}</td><td class="num">${v}/${max}</td><td><span class="bant-rat">${esc(it.why||'')}</span></td></tr>`;
+      h+=it.subs.map(s=>`<tr class="sub"><td class="bc">↳ ${esc(s.k)}</td><td class="num">${s.v}/${s.max}</td><td><span class="bant-rat">${esc(s.why||'')}</span>${q(s.quote)}</td></tr>`).join('');
+      return h;
+    }
+    return `<tr><td class="bc">${esc(it.k)}</td><td class="num">${v}/${max}</td><td><span class="bant-rat">${esc(it.why||'')}</span>${q(it.quote)}</td></tr>`;
+  }).join('');
+  const floorMap={Budget:10,Authority:10,Need:20,Timeline:10};
+  const floorBits=(cb.items||[]).map(it=>{const n=floorMap[it.k];if(n==null)return '';const ok=(it.v!=null?it.v:0)>=n;return `${it.k[0]}≥${n} ${ok?'✓':'✕'}`;}).filter(Boolean).join('  ·  ');
+  const floorRow=`<tr class="flr ${cb.floors_ok?'':'bad'}"><td class="bc">Floors</td><td class="num">${cb.floors_ok?'✓':'✕'}</td><td><span class="bant-rat">${esc(floorBits)}</span></td></tr>`;
+  const fw=cb.field_workers!=null?`${cb.field_workers}${cb.fw_note?` <i>(${esc(cb.fw_note)})</i>`:''}`:'—';
+  const lms=cb.lms_has==='yes'?`Yes${cb.lms_which?` — ${esc(cb.lms_which)}`:''}`:cb.lms_has==='no'?'No':'—';
+  const src=d.inbound===true?'Inbound':d.inbound===false?'Outbound':'Unknown';
+  const fit=cb.fit_ok===true?`<span class="ok">✓</span> ${esc(cb.fit_reason||'')}`:cb.fit_ok===false?`<span class="no">✕</span> ${esc(cb.fit_reason||'')}`:`? ${esc(cb.fit_reason||'')}`;
+  const facts=`<div class="bant-facts"><span>Field workers: <b>${fw}</b></span><span>LMS: <b>${lms}</b></span><span>Source: <b>${src}</b></span><span>Fit: ${fit}</span></div>`;
+  const flags=(cb.flags||[]).map(f=>`<div class="bant-flag">⚑ ${esc(f)}</div>`).join('');
+  const reason=cb.rec_reason?`<div class="bant-reason">${esc(cb.rec_reason)}</div>`:'';
+  const ver=cb.rubric_version?` · ${esc(cb.rubric_version)}`:'';
+  const scoreCol=total>=50?'var(--won)':'var(--lost)';
+  return `<details class="prepcard" id="bant-${d.id}" open><summary class="ph">BANT qualification — SOP §2 rubric<span class="phscore" style="color:${scoreCol}"> · ${total}/100</span></summary><div class="pb">
+    <div class="bant-rec ${recCls}">${recTxt}${tierBit}</div>
+    ${reason}${flags}
+    <table class="bant-tbl"><thead><tr><th>Component</th><th class="num">Score</th><th>Rationale</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="3" class="bant-rat">Scorecard present but no rubric detail.</td></tr>'}${floorRow}</tbody></table>
+    ${facts}
+    <div class="bant-src">Computed by SalesOS from the Gong discovery transcript via the SOP §2 BANT rubric${ver}. Replaces #gong-notifier.</div>
+  </div></details>`;
+}
+/* Fallback: no contact scorecard yet → show the older deal-scoped AI/AE bars. */
+function bantPanelDeal(d){
   const bs=bantScore(d.id);
   const rows=BANT_FIELDS.map(f=>{const r=bantRaw(d.id,f.id);const v=!isNaN(r.v)?r.v:0;const pct=Math.round(v/f.max*100);
     const tag=r.src==='gong'?'<span class="kf-src gong" style="margin-left:6px">Gong</span>':'';
     return `<div class="bant-row"><div class="lab">${f.label}${tag}</div><div class="track"><i style="width:${pct}%"></i></div><div class="bv">${v}/${f.max}</div></div>`;}).join('');
-  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');const statusTxt=bs.filled===0?'No BANT signal extracted yet':pass?'QUALIFIED':'BELOW THRESHOLD';
-  const src=bs.ai?'<span class="kf-note" style="display:block;margin-top:6px">Agent-extracted from Gong — accept the values in the Gate card to confirm.</span>':'';
-  return `<div class="bant" id="bant-${d.id}"><h4>BANT Qualification<span class="score">${bs.filled?bs.total+'/100':'—'}</span></h4>${rows}
-    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div>${src}</div>`;
+  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');
+  const statusTxt=bs.filled===0?'No discovery transcript scored yet':pass?'QUALIFIED':'BELOW THRESHOLD';
+  const note=bs.filled===0
+    ?'<span class="kf-note" style="display:block;margin-top:6px">No Gong discovery transcript has been scored on this lead yet. When the discovery call is held, SalesOS scores the full SOP §2 rubric here automatically.</span>'
+    :(bs.ai?'<span class="kf-note" style="display:block;margin-top:6px">Agent-extracted from Gong — accept the values in the Gate card to confirm.</span>':'');
+  return `<details class="prepcard" id="bant-${d.id}"${bs.filled?' open':''}><summary class="ph">BANT qualification — SOP §2 rubric<span class="phscore"> · ${bs.filled?bs.total+'/100':'—'}</span></summary><div class="pb">${rows}
+    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div>${note}
+  </div></details>`;
 }
 
 /* ---------- ROI Calculator ---------- */

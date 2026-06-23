@@ -132,6 +132,130 @@ Call deal_intelligence with:
         json.dump({"sig": sig, "result": res}, open(cpath,"w"))
         return res
 
+# ================================================================= BANT (SOP §2 rubric)
+# Lead-scoped BANT, computed from the Gong discovery transcript using the SalesOS SOP's
+# OWN rubric — NOT the outdated #gong-notifier n8n algorithm (which we override/sunset).
+# Rubric text is verbatim from quinn-sales-os-experiment/sop/gates.md §2 (v0.4); that SOP
+# is the single source of truth — keep this constant in sync when the SOP rubric changes.
+BANT_RUBRIC_VERSION = "sop-gates-v0.4"
+BANT_RUBRIC = """\
+BANT SCORING RUBRIC — score ONLY from the transcript evidence. Each component cites a verbatim quote.
+
+BUDGET — x/20
+  20 real money allocated and sized for this need · 15 money is solvable, clear willingness to find/redirect ·
+  10 no budget but a credible path to secure it · 5 price-sensitive but exploring (pushback, door not closed) ·
+  0 hard rejection.
+
+AUTHORITY — x/20  (must be operationally-rooted to reach 20; HR/CHRO/CLO/training-only roles cap at 15)
+  20 economic buyer with full signing authority AND ready to decide solo (could say yes next call). Must be
+     ops-rooted (CEO/COO/Owner/VP Ops/GM).
+  15 one of: (a) clearly-interested ops-rooted buyer with signing authority but needs team consensus;
+     (b) strong external operational champion with a named decision-maker + scheduled engagement;
+     (c) strong HR/Training champion orchestrating cross-functionally (this is the ceiling for HR/Training).
+  10 real champion in evaluation; named decision-maker, escalation step discussed but not active ·
+  5 engaged participant without ownership; vague deflection, no named DM · 0 no decision-making structure visible.
+
+NEED — x/40 = Operational Pain (x/20) + Tech Stack (x/10) + Multi-Location (x/5) + Compliance (x/5)
+  Operational Pain (x/20):
+    20 CRISIS — unprompted, multi-vector quantified pain, actively shopping ASAP (ramp >1wk often 2-4wks ·
+       growth/hiring 30%+ of field workforce/yr · callback 20%+ or explicit quality failures hurting revenue ·
+       turnover replacing 30%+/yr).
+    15 real ongoing pain articulated clearly, amplified by growth/hiring, wants to fix this year (ramp 3-7d a
+       real cost · hiring 15-30%/yr or named scaling plans · callback 10-20% or one quantified issue ·
+       elevated-not-bleeding turnover).
+    10 present + acknowledged but coping, no amplifier, often single-vector, no $ attached.
+    5 general desire to improve, no current pain, future-oriented, status quo works · 0 explicitly stable.
+  Tech Stack (x/10):
+    10 no LMS · 5 has an LMS but unhappy/not functioning for the FIELD population or intends to replace
+       (renewal <3mo counts) · 0 well-adopted satisfactory LMS OR renewal 3+ months OR not discussed.
+  Multi-Location (x/5): 5 = 3+ locations · 0 = 1-2.
+  Compliance (x/5): 5 = specific regulatory framework named (OSHA, DOT, HIPAA, EPA, FDA, ASE, fire code...) or
+    compliance/cert described as a pain · 0 not mentioned.
+
+TIMELINE — x/20
+  20 active buying now (~1mo), specific urgency event (audit/launch/deadline) · 15 near-term (~2mo), specific
+  trigger or confident window · 10 named window, no specific trigger ("this summer","Q3") · 5 vague intent
+  ("sometime this year") · 0 pure fact-finding.
+
+ALSO EXTRACT (for fit + funnel columns):
+  field_workers: the number of FIELD workers they would be looking to TRAIN in the context of THIS buying
+    conversation (preferred); if only a total-company figure is stated, use that and note it. null if unknown.
+  lms_has: "yes" if they use any LMS/training software, "no" if explicitly none, "unknown" if not discussed.
+  lms_which: the named product if stated (e.g. "Cornerstone", "ADP"), else "".
+"""
+
+_COMP = {
+  "score":{"type":"integer"},
+  "rationale":{"type":"string","description":"1-2 sentences: HOW and WHY it scored this, per the rubric band."},
+  "quote":{"type":"string","description":"verbatim supporting quote from the transcript, or '' if none"}
+}
+BANT_TOOL = {
+  "name":"bant_score",
+  "description":"Score a Discovery call on the SalesOS BANT rubric, grounded ONLY in the transcript.",
+  "input_schema":{"type":"object","properties":{
+    "budget":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+    "authority":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+    "need":{"type":"object","properties":{
+        "operational_pain":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+        "tech_stack":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+        "multi_location":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+        "compliance":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]}},
+      "required":["operational_pain","tech_stack","multi_location","compliance"]},
+    "timeline":{"type":"object","properties":dict(_COMP),"required":["score","rationale"]},
+    "field_workers":{"type":["integer","null"],"description":"# field workers they'd TRAIN in this deal; null if unknown"},
+    "field_workers_note":{"type":"string","description":"'training scope' or 'company total' — which the number reflects"},
+    "lms_has":{"type":"string","enum":["yes","no","unknown"]},
+    "lms_which":{"type":"string"},
+    "summary":{"type":"string","description":"one-line overall read of the lead's qualification"}
+  },"required":["budget","authority","need","timeline"]}
+}
+
+def _bant_sig(text):
+    h = hashlib.sha1(); h.update((BANT_RUBRIC_VERSION+"|"+(text or "")).encode()); return h.hexdigest()[:16]
+
+def score_bant(transcript, ctx, cache_dir, lead_key, force=False):
+    """Compute lead-scoped BANT from a discovery transcript via the SOP rubric.
+    ctx: {company, employees, contact_title, vertical, tier}. Returns the raw component
+    scorecard (scores+subscores+rationale+quote+field_workers+lms); the qualify/disqualify
+    recommendation + floors are computed by the caller (combines BANT with fit routing).
+    Returns None if there's no transcript to score."""
+    if not (transcript or "").strip():
+        return None
+    cdir = os.path.join(cache_dir, "bant"); os.makedirs(cdir, exist_ok=True)
+    cpath = os.path.join(cdir, f"{lead_key}.json")
+    sig = _bant_sig(transcript)
+    if not force and os.path.exists(cpath):
+        try:
+            cached = json.load(open(cpath))
+            if cached.get("sig") == sig and (cached.get("result") or {}).get("engine") == "claude":
+                return cached["result"]
+        except Exception:
+            pass
+    prompt = f"""You are Quinn's sales qualification analyst. Quinn is an AI training platform for deskless/field-service workforces (HVAC, plumbing, electrical, pest control, restoration, roofing, etc.) — it replaces manual ride-alongs with AI courses built from the customer's own SOPs (ROI levers: faster onboarding ramp, fewer callbacks/quality issues, lower turnover).
+
+Score this Discovery call STRICTLY on the rubric below. Use ONLY the transcript — do not invent facts. For every component give the score, a 1-2 sentence rationale tied to the rubric band, and a verbatim quote (or '' if none).
+
+LEAD: {ctx.get('company','?')} — {ctx.get('employees','?')} employees · primary contact title: {ctx.get('contact_title','?')} · vertical/tier (pre-call): {ctx.get('vertical','?')} / {ctx.get('tier','?')}
+
+{BANT_RUBRIC}
+
+TRANSCRIPT:
+{(transcript or '')[:14000]}
+
+Call bant_score with every component scored."""
+    try:
+        msg = client().messages.create(model=MODEL, max_tokens=3500,
+            tools=[BANT_TOOL], tool_choice={"type":"tool","name":"bant_score"},
+            messages=[{"role":"user","content":prompt}])
+        result = {}
+        for b in msg.content:
+            if b.type == "tool_use": result = b.input; break
+        result["engine"] = "claude"; result["rubric_version"] = BANT_RUBRIC_VERSION
+        json.dump({"sig": sig, "result": result}, open(cpath,"w"))
+        return result
+    except Exception as e:
+        return {"engine":"error","error":str(e)[:140]}
+
 # ----------------------------------------------------------------- heuristic fallback
 PAIN_KW=["pain","problem","struggle","challenge","headache","bottleneck","turnover","callback","ramp","onboard","compliance","manual","inconsistent","tribal","retention"]
 BUY_KW =["pricing","price","budget","cost","contract","proposal","timeline","when can we","sign","move forward","next step","roi","invest"]

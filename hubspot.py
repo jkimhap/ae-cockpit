@@ -109,7 +109,14 @@ def contacts_for(ids):
     # "Which LMS?") — they pre-fill the Discovery Booked enrichment row; empty stays empty.
     return batch_read("contacts", ids,
         ["firstname","lastname","email","jobtitle","phone","industry_category",
-         "num_of_learners","lms","which_lms_"])
+         "num_of_learners","lms","which_lms_","frontline_workers_est","hs_linkedin_url",
+         # lead_source_custom = the "Primary Source" property — drives inbound/outbound
+         # (Johnny's exact mapping; assemble._inbound). NOTE stored VALUES differ from labels
+         # (e.g. "Cold Call" stores as "ZoomInfo").
+         "lead_source_custom","hs_analytics_source","hs_latest_source"])
+    # NB: BANT is now computed by SalesOS from the transcript via the SOP rubric (ai.score_bant),
+    # NOT read from the outdated #gong-notifier contact props. Those props are intentionally
+    # no longer pulled.
 
 def calls_for(ids):
     return batch_read("calls", ids,

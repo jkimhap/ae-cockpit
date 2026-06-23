@@ -21,11 +21,25 @@ def _req(method, path, **kw):
     r.raise_for_status()
 
 def find_user(email):
+    """Resolve a HubSpot owner email to a Gong user id.
+
+    The Gong workspace identifies reps on the legacy @lunapark.com domain, while
+    HubSpot owns them on @meetquinn.ai (same person, same local-part). So we match
+    the exact address first, then fall back to the local-part on any internal Gong
+    domain (preferring an active account) — e.g. arlen@meetquinn.ai -> arlen@lunapark.com.
+    """
     data = _req("GET", "/v2/users")
-    for u in data.get("users", []):
-        if (u.get("emailAddress") or "").lower() == email.lower():
+    users = data.get("users", [])
+    email = (email or "").lower()
+    local = email.split("@")[0] if "@" in email else email
+    for u in users:                                   # 1) exact email
+        if (u.get("emailAddress") or "").lower() == email:
             return u["id"]
-    return None
+    cand = [u for u in users                          # 2) same local-part, internal domain
+            if (u.get("emailAddress") or "").lower().split("@")[0] == local
+            and (u.get("emailAddress") or "").lower().split("@")[-1] in INTERNAL]
+    cand.sort(key=lambda u: 0 if u.get("active") else 1)   # prefer active
+    return cand[0]["id"] if cand else None
 
 def calls_for_user(user_id, days=180):
     """Calls hosted/primary by this user in the window, with parties + CRM context."""
