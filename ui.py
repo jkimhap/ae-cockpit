@@ -46,295 +46,738 @@ def placeholder_html(title, message, active="ian"):
             + '</body></html>')
 
 def dashboard_html():
-    """Cross-AE Dashboard — Quinn-OS "Trends" feel, sales-tuned. KPI stat row +
-    two hand-rolled inline-SVG charts, with an AE toggle (Grant / Arlen). All
-    computation happens client-side from /api/dashboard so it re-renders live
-    when the toggle changes. Degrades to Grant-only (or an empty state) when a
-    payload is missing."""
-    return '<!doctype html><html lang="en">' + _head() + '<body>' + _topbar() + _tab_bar('dashboard') + DASHBOARD_BODY + '</body></html>'
+    """Cross-AE Dashboard — a faithful clone of the QuinnOS *Trends* page,
+    sales-tuned. The DATA[view][rep][metric] series + goal cards + conversion
+    are computed server-side in dash.py from the cached payloads and embedded;
+    the QuinnOS renderer (buildSVG / renderCard / renderGoalCards / showPop /
+    toggles, ported verbatim) draws everything client-side, driven by the
+    Weekly/Monthly, ARR/TCV, and rep (Total / Grant / Arlen / Ian) toggles."""
+    import json, dash
+    try:
+        data = dash.trends_data()
+    except Exception:
+        data = {"weekly": {}, "monthly": {}, "goal_cards": [], "conversion": {},
+                "reps": [{"slug": "all", "label": "Total"}], "refreshed": {}}
+    conv = data.pop("conversion", {})
+    reps = data.get("reps") or [{"slug": "all", "label": "Total"}]
+    rep_buttons = "".join(
+        '<button data-rep="%s"%s>%s</button>' % (
+            r["slug"], ' class="active"' if i == 0 else "", r["label"])
+        for i, r in enumerate(reps))
+    refreshed = " · ".join("%s %s" % (k.title(), v[:16].replace("T", " "))
+                           for k, v in (data.get("refreshed") or {}).items()) or "—"
+    def _embed(obj):
+        # \/ keeps a stray "</script>" in any string field from closing the tag.
+        return json.dumps(obj).replace("</", "<\\/")
+    body = (DASHBOARD_BODY
+            .replace("__REP_BUTTONS__", rep_buttons)
+            .replace("__REFRESHED__", refreshed)
+            .replace("__TREND_DATA__", _embed(data))
+            .replace("__CONVERSION_DATA__", _embed(conv)))
+    return ('<!doctype html><html lang="en">' + _head() + '<body>'
+            + _topbar() + _tab_bar('dashboard') + body + '</body></html>')
 
 DASHBOARD_BODY = r"""
-<div class="dashwrap" id="dashRoot">
-  <div class="loading"><span class="spin"></span> Loading team data…</div>
-</div>
-<script>
-const $D=s=>document.querySelector(s);
-const escD=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const moneyD=v=>v==null||isNaN(v)?'$0':'$'+Math.round(+v).toLocaleString();
-const moneyK=v=>{v=+v||0;return v>=1000?'$'+(v/1000).toFixed(v>=10000?0:1)+'k':'$'+Math.round(v);};
-let RAW=null;           // {grant:payload|null, arlen:payload|null}
-let sel={grant:true,arlen:true};   // both on = full team
-const STCOLOR={Won:'won',Lost:'lost',Booked:'booked',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'};
+<style>
+/* ===== QuinnOS "Trends" chart system — ported verbatim for exact RGB + layout
+   parity. These vars are scoped after the cockpit :root so the dashboard charts
+   use QuinnOS's exact palette (incl. the muted brick --lost and amber --quote).
+   The per-rep cockpit pages are unaffected (different served page). ===== */
+:root {
+  --paper: #f7f3eb; --softer: #f1ecdf; --soft: #e8e0cf; --line: #d6cdb7;
+  --ink: #2b2b2b; --muted: #8a8275;
+  --core: #3a6a3a; --core-bg: #d4e4cb;
+  --quote: #b87b1f; --quote-bg: #f1e2c4;
+  --won: #3a6a3a; --won-bg: #d4e4cb;
+  --lost: #a8454c; --lost-bg: #ecd0cd;
+}
+/* Full-bleed wrapper — no max-width, so charts span the whole page width like
+   QuinnOS (the SalesOS dashboard used to be narrow/capped). */
+.trends-wrap { padding: 22px 36px 80px; }
+.trends-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  margin-bottom: 14px;
+}
+/* Controls row (rep + period + metric toggles) — top-right cluster */
+.controls {
+  display: flex; justify-content: flex-end; align-items: center; gap: 14px;
+  margin-bottom: 22px; flex-wrap: wrap;
+}
+.toggle-group {
+  display: inline-flex; border: 1px solid var(--ink);
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.toggle-group button {
+  border: none; background: transparent; padding: 7px 14px;
+  cursor: pointer; color: var(--ink); font-family: inherit; font-size: inherit;
+  text-transform: inherit; letter-spacing: inherit;
+}
+.toggle-group button.active { background: var(--ink); color: var(--paper); }
+.toggle-group button:not(:last-child) { border-right: 1px solid var(--ink); }
 
-// Which reps are effectively active: none selected → treat as full team.
-function activeReps(){
-  const reps=Object.keys(RAW).filter(r=>RAW[r]);              // only loaded reps
-  const on=reps.filter(r=>sel[r]);
-  return on.length?on:reps;                                   // none on → all
+.section-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 4px; margin-top: 24px; }
+.section-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.chart-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px; margin-bottom: 32px;
 }
-function mergedDeals(){
-  let out=[];activeReps().forEach(r=>{(RAW[r].deals||[]).forEach(d=>out.push(Object.assign({_rep:r},d)));});return out;
+.chart-card {
+  background: var(--paper); border: 1px solid var(--ink); padding: 18px 20px;
 }
-function mergedUpcoming(){
-  let out=[];activeReps().forEach(r=>{(RAW[r].upcoming||[]).forEach(u=>out.push(Object.assign({_rep:r},u)));});return out;
+/* ── Goal cards (Q2 CW, Q2 Sourcing) ───────────────────────────────────── */
+.goal-card {
+  background: var(--paper); border: 1px solid var(--ink); padding: 18px 24px;
+  margin-bottom: 16px; max-width: 920px;
 }
-const isBooked=d=>d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0;
-const dealVal=d=>d.arr||d.amount||0;
+.goal-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; margin-bottom: 2px; }
+.goal-sub   { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+              color: var(--muted); margin-bottom: 14px; }
+.goal-headline { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.goal-big { font-family: 'Fraunces', serif; font-size: 36px; font-weight: 600; letter-spacing: -1px; line-height: 1; }
+.goal-of  { font-family: 'Fraunces', serif; font-size: 18px; color: var(--muted); }
+.goal-pace {
+  margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  font-weight: 600; padding: 4px 10px; border-radius: 2px; letter-spacing: 1px;
+  text-transform: uppercase; border: 1px solid;
+}
+.pace-ahead  { color: var(--core); background: var(--core-bg); border-color: var(--core); }
+.pace-behind { color: #c4757b; background: #fbeeed; border-color: #e7c0bf; }
+.goal-bar {
+  position: relative; height: 12px; background: var(--soft);
+  border: 1px solid var(--ink); margin-bottom: 14px; overflow: visible;
+}
+.goal-fill { height: 100%; background: var(--core); transition: width 0.4s ease; }
+.goal-marker {
+  position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink);
+}
+.goal-marker::after {
+  content: ''; position: absolute; left: -3px; top: -3px;
+  width: 8px; height: 8px; background: var(--ink); border-radius: 50%;
+}
+.goal-row { display: flex; gap: 32px; font-family: 'JetBrains Mono', monospace; font-size: 11px; flex-wrap: wrap; }
+.goal-row > div { display: flex; flex-direction: column; gap: 4px; }
+.goal-label { color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; font-size: 9px; }
+.goal-val   { font-size: 18px; font-family: 'Fraunces', serif; color: var(--ink); }
+.goal-sublabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--muted); margin-top: -2px; }
+.chart-card .label {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px;
+}
+.chart-card .headline {
+  font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; margin-bottom: 2px;
+}
+.chart-card { position: relative; }
+.chart-card .sublabel {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-bottom: 14px;
+  min-height: 1.2em;
+}
+.card-toggle {
+  position: absolute; top: 14px; right: 18px;
+  display: inline-flex; border: 1px solid var(--soft);
+  font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.card-toggle button {
+  border: none; background: transparent; padding: 4px 8px;
+  cursor: pointer; color: var(--muted); font-family: inherit; font-size: inherit;
+  text-transform: inherit; letter-spacing: inherit;
+}
+.card-toggle button.active { background: var(--ink); color: var(--paper); }
+.card-toggle button:not(:last-child) { border-right: 1px solid var(--soft); }
+.chart-card .chart-svg { display: block; width: 100%; height: 150px; cursor: crosshair; }
+.chart-card .footnote {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.4;
+  color: var(--muted); margin-top: 10px; padding-top: 8px;
+  border-top: 1px dotted var(--soft); font-style: italic;
+}
+.chart-card .trend-bar { cursor: pointer; transition: opacity 0.12s; }
+.chart-card .trend-bar:hover { opacity: 1 !important; }
 
-// ---- lifecycle signals from dated stage-transition events in each deal's timeline ----
-const won_of=ds=>ds.filter(d=>!d.is_open&&d.stage==='Won');
-const lost_of=ds=>ds.filter(d=>!d.is_open&&d.stage==='Lost');
-const stageEvts=d=>(d.timeline||[]).filter(e=>e.kind==='stage'&&e.ts).map(e=>({ts:e.ts,title:e.title||''}));
-function createdTs(d){const s=stageEvts(d).map(e=>e.ts).sort();if(s.length)return s[0];
-  const all=(d.timeline||[]).map(e=>e.ts).filter(Boolean).sort();return all.length?all[0]:null;}
-function closedTs(d,word){const ev=stageEvts(d).filter(e=>e.title.indexOf(word)>=0).map(e=>e.ts).sort();
-  if(ev.length)return ev[ev.length-1];const s=stageEvts(d).map(e=>e.ts).sort();return s.length?s[s.length-1]:createdTs(d);}
+/* ── Conversion section ─────────────────────────────────────────────────── */
+#conversion { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { #conversion { grid-template-columns: 1fr; } }
+.conv-card {
+  background: var(--paper); border: 1px solid var(--soft); padding: 18px 20px;
+}
+.conv-card h3 {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted);
+  margin-bottom: 2px;
+}
+.conv-card .sub {
+  font-size: 11px; color: var(--muted); margin-bottom: 16px; line-height: 1.4;
+}
+.cohort-row { display: grid; grid-template-columns: 52px 1fr 90px; align-items: center; gap: 10px; margin-bottom: 7px; }
+.cohort-row .mlabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink); }
+.cohort-track { position: relative; height: 18px; background: var(--soft); border-radius: 2px; overflow: hidden; }
+.cohort-fill { height: 100%; background: var(--won, #3a6a3a); }
+.cohort-fill.maturing { background: repeating-linear-gradient(45deg, var(--quote,#b8893a), var(--quote,#b8893a) 4px, rgba(0,0,0,0.08) 4px, rgba(0,0,0,0.08) 8px); }
+.cohort-row .cstat { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; white-space: nowrap; }
+.cohort-row .cstat b { color: var(--ink); font-size: 11px; }
+.cohort-row.maturing .cstat::after { content: ' 🟡'; }
+table.conv-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.conv-tbl th {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); text-align: right; padding: 5px 8px;
+  border-bottom: 1px solid var(--ink); white-space: nowrap;
+}
+table.conv-tbl th:first-child { text-align: left; }
+table.conv-tbl td { padding: 7px 8px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--soft); }
+table.conv-tbl td:first-child { text-align: left; font-weight: 600; }
+table.conv-tbl td .wr { font-weight: 700; }
+table.conv-tbl tr.renewals td { color: var(--muted); font-style: italic; border-top: 1px solid var(--soft); }
+.conv-foot {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.5;
+  color: var(--muted); margin-top: 14px; font-style: italic;
+}
+#trend-popover {
+  position: absolute; z-index: 200; display: none;
+  background: var(--paper); border: 1px solid var(--ink);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+  padding: 14px 18px; max-width: 380px; min-width: 280px;
+  pointer-events: auto;
+}
+#trend-popover.open { display: block; }
+#trend-popover .tp-week {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px;
+}
+#trend-popover .tp-value {
+  font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; margin-bottom: 10px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--soft);
+}
+#trend-popover .tp-items { font-size: 12px; max-height: 380px; overflow-y: auto; }
+#trend-popover .tp-item { padding: 4px 0; border-bottom: 1px dotted var(--soft); }
+#trend-popover .tp-item:last-child { border-bottom: none; }
+#trend-popover .tp-item .name { font-weight: 500; color: var(--ink); }
+#trend-popover .tp-ext-link {
+  color: var(--ink); text-decoration: none;
+  border-bottom: 1px dotted var(--muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+#trend-popover .tp-ext-link:hover { color: var(--core); border-bottom-color: var(--core); }
+#trend-popover .tp-ext-link::after { content: ' ↗'; font-size: 9px; color: var(--muted); }
+#trend-popover .tp-item .sub  { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted); }
+#trend-popover .tp-empty { color: var(--muted); font-style: italic; font-size: 12px; }
+#trend-popover .tp-breakdown {
+  margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--soft);
+}
+#trend-popover .tp-section-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  text-transform: uppercase; letter-spacing: 2px; color: var(--muted);
+  margin-top: 4px; margin-bottom: 6px;
+}
+#trend-popover .tp-bd-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12px; padding: 2px 0;
+}
+#trend-popover .tp-bd-name { color: var(--ink); }
+#trend-popover .tp-bd-count {
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--core);
+}
+</style>
 
-// ---- KPIs ----
-function kpis(){
-  const ds=mergedDeals();const open=ds.filter(d=>d.is_open);
-  const openPipe=open.reduce((s,d)=>s+dealVal(d),0);
-  const won=won_of(ds),lost=lost_of(ds);
-  const wonAmt=won.reduce((s,d)=>s+dealVal(d),0);
-  const wr=(won.length+lost.length)?Math.round(won.length/(won.length+lost.length)*100):0;
-  const avg=won.length?wonAmt/won.length:0;
-  const now=new Date();
-  const next30=mergedUpcoming().filter(u=>{const t=new Date(u.start);return !isNaN(t)&&(t-now)<=30*864e5&&(t-now)>=-864e5;}).length;
-  return [
-    {v:moneyK(openPipe),l:'Open pipeline',sub:open.length+' open deals'},
-    {v:mergedUpcoming().length,l:'Meetings booked',sub:next30+' next 30d'},
-    {v:won.length,l:'Closed won',sub:moneyD(wonAmt)},
-    {v:wr+'%',l:'Win rate',sub:won.length+'W / '+lost.length+'L'},
-    {v:moneyK(avg),l:'Avg deal size',sub:'won deals'},
-  ];
-}
+<div class="trends-wrap">
+  <div class="trends-meta">SalesOS · trends data refreshed __REFRESHED__</div>
 
-// ---- reusable inline-SVG bar chart ----
-// data: [{label, value, color?}], opts:{w,h,fmt,color}
-function barChart(data,opts){
-  opts=opts||{};
-  const w=opts.w||520,h=opts.h||220,pad={t:14,r:10,b:34,l:10};
-  const n=data.length;
-  if(!n)return '<div class="empty">No data.</div>';
-  const max=Math.max(1,...data.map(d=>d.value));
-  const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
-  const gap=Math.min(18,iw/n*0.3), bw=(iw-gap*(n-1))/n;
-  const fmt=opts.fmt||(v=>v);
-  const accent=opts.color||'var(--core)';
-  let bars='';
-  // QuinnOS style: spotlight the current (last) period in the accent colour; de-emphasise
-  // history in muted ink. Single accent per chart — never a rainbow. Flat bars (no radius).
-  data.forEach((d,i)=>{
-    const bh=Math.max(1,Math.round(d.value/max*ih));
-    const x=pad.l+i*(bw+gap), y=pad.t+ih-bh;
-    const cur=i===n-1;
-    const fill=cur?(d.color||accent):'var(--ink)';
-    const op=cur?1:0.42;
-    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh}" fill="${fill}" opacity="${op}"></rect>`;
-    if(cur&&d.value>0)bars+=`<text class="vlab" x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">${escD(fmt(d.value))}</text>`;
-    if(cur||i%2===0)bars+=`<text class="axlab" x="${(x+bw/2).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;
-  });
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
-    <line x1="${pad.l}" y1="${pad.t+ih+0.5}" x2="${w-pad.r}" y2="${pad.t+ih+0.5}" stroke="var(--line)" stroke-width="1"></line>${bars}</svg>`;
-}
-
-// ---- inline-SVG line/area chart (cumulative) ----
-function lineChart(data,opts){
-  opts=opts||{};const w=opts.w||520,h=opts.h||200,pad={t:16,r:14,b:34,l:12};
-  const n=data.length;if(!n)return '<div class="empty">No data.</div>';
-  const max=Math.max(1,...data.map(d=>d.value));
-  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b,fmt=opts.fmt||(v=>v);
-  const X=i=>pad.l+(n<=1?iw/2:i/(n-1)*iw), Y=v=>pad.t+ih-Math.max(0,v/max*ih);
-  let dpath='';data.forEach((d,i)=>{dpath+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(d.value).toFixed(1)+' ';});
-  const apath='M'+X(0).toFixed(1)+' '+(pad.t+ih)+' '+dpath.replace(/^M/,'L')+'L'+X(n-1).toFixed(1)+' '+(pad.t+ih)+' Z';
-  let dots='';data.forEach((d,i)=>{const cur=i===n-1;dots+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="${cur?3.4:2.2}" fill="var(--core)" opacity="${cur?1:0.6}"></circle>`+
-    ((cur||i%2===0)?`<text class="axlab" x="${X(i).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`:'');});
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
-    <path d="${apath}" fill="var(--core)" opacity="0.08"></path>
-    <path d="${dpath}" fill="none" stroke="var(--core)" stroke-width="2"></path>
-    <text x="${(w-pad.r).toFixed(1)}" y="${(Y(data[n-1].value)-7).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--ink)">${escD(fmt(data[n-1].value))}</text>${dots}</svg>`;
-}
-
-// ---- weekly bucketing of dated events → dense series (gaps filled), capped to last `weeks` ----
-function mondayOf(dt){const d=new Date(dt);if(isNaN(d))return null;const day=(d.getDay()+6)%7;const m=new Date(d);m.setHours(0,0,0,0);m.setDate(d.getDate()-day);return m;}
-const wlabel=m=>(m.getMonth()+1)+'/'+m.getDate();
-function weekly(events,weeks){
-  const b={};events.forEach(e=>{const m=mondayOf(e.ts);if(!m)return;const k=m.getTime();(b[k]=b[k]||{sum:0}).sum+=(e.value||0);});
-  const keys=Object.keys(b).map(Number).sort((a,x)=>a-x);if(!keys.length)return [];
-  const WK=7*864e5,out=[];for(let t=keys[0];t<=keys[keys.length-1];t+=WK)out.push({label:wlabel(new Date(t)),value:b[t]?b[t].sum:0});
-  return (weeks&&out.length>weeks)?out.slice(out.length-weeks):out;
-}
-function cumulativeSeries(events){const s=weekly(events);let run=0;return s.map(p=>({label:p.label,value:(run+=p.value)}));}
-
-// ---- metric event extractors (ts + value) ----
-const evMeetings=()=>mergedUpcoming().map(u=>({ts:u.start,value:1}));
-const evCalls=()=>{const o=[];mergedDeals().forEach(d=>(d.calls||[]).forEach(c=>{if(c.date)o.push({ts:c.date,value:1});}));return o;};
-const evCreated=()=>mergedDeals().map(d=>({ts:createdTs(d),value:1})).filter(e=>e.ts);
-const evWon=val=>won_of(mergedDeals()).map(d=>({ts:closedTs(d,'Won'),value:val?dealVal(d):1})).filter(e=>e.ts);
-const evLost=val=>lost_of(mergedDeals()).map(d=>({ts:closedTs(d,'Lost'),value:val?dealVal(d):1})).filter(e=>e.ts);
-function avgDealWeekly(){const cnt=weekly(evWon(false)),m={};weekly(evWon(true)).forEach(p=>m[p.label]=p.value);
-  return cnt.map(p=>({label:p.label,value:p.value?Math.round((m[p.label]||0)/p.value):0}));}
-
-// ---- pipeline stage mix (open deals), colored per stage (layered KPI) ----
-const STAGE_ORDER=[['Booked','Disc Booked'],['Discovery','Discovery'],['Demo','Demo'],['Quote','Quote'],['Verbal','Verbal']];
-function stageMix(byVal){
-  const open=mergedDeals().filter(d=>d.is_open),c={};STAGE_ORDER.forEach(([k])=>c[k]=0);
-  open.forEach(d=>{const k=isBooked(d)?'Booked':d.stage;if(c[k]!=null)c[k]+=byVal?dealVal(d):1;});
-  return STAGE_ORDER.map(([k,lab])=>({label:lab,value:c[k],color:'var(--'+(STCOLOR[k]||'demo')+')'}));
-}
-
-// ---- conversion: win rate by rep + by creation cohort ----
-function winByRep(){
-  return activeReps().map(r=>{const ds=(RAW[r].deals||[]);
-    const w=ds.filter(d=>!d.is_open&&d.stage==='Won').length, l=ds.filter(d=>!d.is_open&&d.stage==='Lost').length;
-    return {label:r,rate:(w+l)?w/(w+l):0,w,l};}).sort((a,b)=>b.rate-a.rate);
-}
-function winByCohort(){
-  const m={};mergedDeals().forEach(d=>{const t=createdTs(d);if(!t)return;const k=String(t).slice(0,7);
-    (m[k]=m[k]||{w:0,l:0,o:0});if(d.is_open)m[k].o++;else if(d.stage==='Won')m[k].w++;else if(d.stage==='Lost')m[k].l++;});
-  return Object.keys(m).sort().map(k=>{const c=m[k],dec=c.w+c.l;
-    return {label:k,rate:dec?c.w/dec:0,w:c.w,l:c.l,o:c.o,maturing:c.o>dec};});
-}
-
-// ---- render helpers ----
-function card(title,svg){return `<div class="chartbox"><h3>${escD(title)}</h3>${svg}</div>`;}
-function winRows(){
-  const rep=winByRep();
-  const repHtml=rep.length?rep.map(x=>`<div class="wrow"><div class="wl">${escD(x.label)}</div>
-    <div class="wtrack"><div class="wfill" style="width:${(x.rate*100).toFixed(0)}%"></div></div>
-    <div class="wstat"><b>${(x.rate*100).toFixed(0)}%</b> · ${x.w}W/${x.l}L</div></div>`).join(''):'<div class="empty">No closed deals.</div>';
-  const co=winByCohort();
-  const coHtml=co.length?co.map(x=>`<div class="wrow"><div class="wl">${escD(x.label)}${x.maturing?' 🟡':''}</div>
-    <div class="wtrack"><div class="wfill" style="width:${(x.rate*100).toFixed(0)}%;${x.maturing?'opacity:.5':''}"></div></div>
-    <div class="wstat"><b>${(x.rate*100).toFixed(0)}%</b> · ${x.w}W/${x.l}L${x.o?' · '+x.o+'o':''}</div></div>`).join(''):'<div class="empty">No data.</div>';
-  return `<div class="chartbox"><h3>Win rate by rep</h3>${repHtml}</div>
-    <div class="chartbox"><h3>Win rate by creation cohort</h3>${coHtml}<div class="delta flat" style="margin-top:10px">🟡 maturing — more deals still open than decided</div></div>`;
-}
-
-// ---- open pipeline reconstructed point-in-time, per week (from dated stage events) ----
-// Answers "what was open pipeline worth at the end of each of the last N weeks": a deal
-// counts in week W if it had been created by W's end and had NOT yet closed by W's end.
-function weekMondays(weeks){
-  const today=mondayOf(new Date());if(!today)return [];
-  const out=[];for(let i=weeks-1;i>=0;i--){const m=new Date(today);m.setDate(today.getDate()-i*7);out.push(m);}
-  return out;
-}
-function pipelineSeries(weeks){
-  const ds=mergedDeals(), ms=weekMondays(weeks);
-  return ms.map(m=>{const end=new Date(m);end.setDate(m.getDate()+6);end.setHours(23,59,59,999);const et=end.getTime();
-    let v=0;ds.forEach(d=>{const ct=Date.parse(createdTs(d)||'');if(isNaN(ct)||ct>et)return;
-      let openAt;if(d.is_open)openAt=true;else{const cl=Date.parse(closedTs(d,d.stage==='Won'?'Won':'Lost')||'');openAt=isNaN(cl)?false:(cl>et);}
-      if(openAt)v+=dealVal(d);});
-    return {label:wlabel(m),value:Math.round(v)};});
-}
-
-// ---- Q2 performance goals (the canonical GTM plan committed with Arlen) ----
-const Q2_START=Date.parse('2026-04-01T00:00:00Z'), Q2_END=Date.parse('2026-06-30T23:59:59Z');
-const REPNAME={grant:'Grant',arlen:'Arlen',ian:'Ian',luke:'Luke'};
-const OWNER_NAME_BY_ID={'80532323':'Arlen','77307934':'Derek','80723038':'Grant','80723039':'Ian','86257981':'Luke','80734651':'Bo'};
-const Q2_GOALS=[
-  {title:'Q2 Closed-Won Goal',sub:'Closed-won ARR · Apr 1 – Jun 30 · deal-owner attribution',company:580000,byRep:{Arlen:230000,Grant:100000}},
-  {title:'Q2 Sourcing Goal',sub:'Closed-won ARR · Apr 1 – Jun 30 · primary-contributor (sourcing AE)',company:325000,byRep:{Grant:75000,Luke:100000,Ian:90000}},
-];
-function q2WonByRep(){
-  const out={};Object.keys(RAW).forEach(r=>{if(!RAW[r])return;let v=0;
-    (RAW[r].deals||[]).forEach(d=>{if(d.is_open||d.stage!=='Won')return;
-      const t=Date.parse(closedTs(d,'Won')||'');if(isNaN(t)||t<Q2_START||t>Q2_END)return;v+=dealVal(d);});
-    out[REPNAME[r]||r]=v;});
-  return out;
-}
-function q2SrcByRep(){
-  const out={};mergedDeals().forEach(d=>{if(d.is_open||d.stage!=='Won')return;
-    const t=Date.parse(closedTs(d,'Won')||'');if(isNaN(t)||t<Q2_START||t>Q2_END)return;
-    const nm=OWNER_NAME_BY_ID[String(d.primary_contributor||'')];if(!nm)return;
-    out[nm]=(out[nm]||0)+dealVal(d);});
-  return out;
-}
-function goalRow(name,target,actual,hasActual){
-  const pct=target?Math.min(100,Math.round(actual/target*100)):0;
-  const stat=hasActual?`<b>${moneyK(actual)}</b> / ${moneyK(target)} · ${pct}%`:`<span style="color:var(--muted)">— / ${moneyK(target)}</span>`;
-  return `<div class="wrow"><div class="wl">${escD(name)}</div>
-    <div class="wtrack"><div class="wfill" style="width:${hasActual?pct:0}%"></div></div>
-    <div class="wstat">${stat}</div></div>`;
-}
-function goalCard(g,actuals,hasData,note){
-  const comp=Object.keys(g.byRep).reduce((s,nm)=>s+(actuals[nm]||0),0);
-  const pct=g.company?Math.round(comp/g.company*100):0;
-  const rows=Object.keys(g.byRep).map(nm=>goalRow(nm,g.byRep[nm],actuals[nm]||0,hasData)).join('');
-  return `<div class="chartbox"><h3>${escD(g.title)}</h3>
-    <div class="section-sub" style="margin:-2px 0 10px">${escD(g.sub)}</div>
-    <div class="headline">${hasData?moneyK(comp):'—'} <span style="color:var(--muted);font-size:14px;font-weight:500">/ ${moneyK(g.company)} company · ${hasData?pct+'%':'plan'}</span></div>
-    <div class="wtrack" style="margin:7px 0 13px"><div class="wfill" style="width:${hasData?Math.min(100,pct):0}%"></div></div>
-    ${rows}${note?`<div class="delta flat" style="margin-top:10px">${escD(note)}</div>`:''}</div>`;
-}
-function goalCards(){
-  const src=q2SrcByRep(), srcHas=Object.keys(src).length>0;
-  return goalCard(Q2_GOALS[0],q2WonByRep(),true,'Live · synced reps only — fills in as each AE syncs')
-       + goalCard(Q2_GOALS[1],src,srcHas,srcHas?'Live · primary-contributor attribution':'Canonical Q2 sourcing plan — live attribution lands on the next full sync');
-}
-
-function freshLine(){
-  const parts=[];
-  ['grant','arlen'].forEach(r=>{if(RAW[r]&&RAW[r].refreshed)parts.push(r.charAt(0).toUpperCase()+r.slice(1)+' · '+String(RAW[r].refreshed).replace(' UTC','').slice(0,16));});
-  return parts.length?('HubSpot synced — '+parts.join('  ·  ')):'No data loaded';
-}
-
-function render(){
-  const root=$D('#dashRoot');
-  const loaded=Object.keys(RAW).filter(r=>RAW[r]);
-  if(!loaded.length){
-    root.innerHTML=`<div class="masthead"><div><div class="ttl">Quinn SalesOS — Dashboard</div><div class="meta">No data loaded</div></div></div>
-      <div class="dash-empty"><div class="big">No payloads found</div><div class="sm">Run a sync first — open a rep cockpit and hit Full sync.</div></div>`;
-    return;
-  }
-  const tg=['grant','arlen'].map(r=>{
-    const exists=!!RAW[r];const on=sel[r];
-    return `<button class="${on&&exists?'active':''}" ${exists?'':'disabled style="opacity:.4;cursor:default"'} onclick="toggleRep('${r}')">${r}</button>`;
-  }).join('');
-  const k=kpis(), mf=v=>moneyK(v);
-  const LOST='#a8454c';   // QuinnOS muted burgundy for lost (deal-view stage red stays as-is)
-  const lead=[
-    card('First sales calls held / wk',barChart(weekly(evCalls(),12),{color:'var(--core)'})),
-    card('Deals created / wk',barChart(weekly(evCreated(),12),{color:'var(--core)'})),
-    card('Meetings booked / wk',barChart(weekly(evMeetings(),12),{color:'var(--core)'})),
-    card('Open pipeline · weekly',lineChart(pipelineSeries(12),{fmt:mf})),
-  ].join('');
-  const trail=[
-    card('Closed-won deals / wk',barChart(weekly(evWon(false),12),{color:'var(--core)'})),
-    card('Closed-won value / wk',barChart(weekly(evWon(true),12),{color:'var(--core)',fmt:mf})),
-    card('Closed-lost deals / wk',barChart(weekly(evLost(false),12),{color:LOST})),
-    card('Closed-lost value / wk',barChart(weekly(evLost(true),12),{color:LOST,fmt:mf})),
-    card('Avg deal size / wk',barChart(avgDealWeekly(),{color:'var(--core)',fmt:mf})),
-    card('Cumulative value won',lineChart(cumulativeSeries(evWon(true)),{fmt:mf})),
-  ].join('');
-  root.innerHTML=`
-    <div class="masthead">
-      <div><div class="ttl">Quinn SalesOS — Dashboard</div><div class="meta">${escD(freshLine())}</div></div>
-      <div class="toggle-group">${tg}</div>
+  <div class="controls">
+    <div class="toggle-group" role="tablist" aria-label="Rep" id="rep-toggle">
+      __REP_BUTTONS__
     </div>
-    <div class="kpirow">${k.map(x=>`<div class="kpi"><div class="v tnum">${escD(x.v)}</div><div class="l">${escD(x.l)}</div>${x.sub?`<div class="sub2 tnum">${escD(x.sub)}</div>`:''}</div>`).join('')}</div>
-    <div class="section-title">Leading indicators</div><div class="section-sub">Activity that builds pipeline · last 12 weeks</div>
-    <div class="chartgrid">${lead}</div>
-    <div class="section-title">Performance goals</div><div class="section-sub">Q2 plan vs. actuals · Apr 1 – Jun 30</div>
-    <div class="chartgrid">${goalCards()}</div>
-    <div class="section-title">Trailing indicators</div><div class="section-sub">Outcomes · last 12 weeks</div>
-    <div class="chartgrid">${trail}</div>
-    <div class="section-title">Conversion</div><div class="section-sub">Win rate</div>
-    <div class="chartgrid">${winRows()}</div>`;
-}
-function toggleRep(r){if(!RAW[r])return;sel[r]=!sel[r];render();}
+    <div class="toggle-group" role="tablist" aria-label="Period">
+      <button data-view="weekly" class="active">Weekly</button>
+      <button data-view="monthly">Monthly</button>
+    </div>
+    <div class="toggle-group" role="tablist" aria-label="Metric">
+      <button data-metric="arr" class="active">ARR</button>
+      <button data-metric="tcv">TCV</button>
+    </div>
+  </div>
 
-async function boot(){
-  try{
-    const res=await fetch('/api/dashboard');const j=await res.json();
-    RAW={grant:j.grant||null,arlen:j.arlen||null};
-    ['grant','arlen'].forEach(r=>{if(!RAW[r])sel[r]=false;});   // don't pre-select a missing rep
-    render();
-  }catch(e){
-    $D('#dashRoot').innerHTML='<div class="dash-empty"><div class="big">Failed to load</div><div class="sm">'+escD(e.message||e)+'</div></div>';
+  <div class="section-title">Leading Indicators</div>
+  <div class="section-sub" id="leading-sub">Top-of-funnel activity. Hover any bar/point for the underlying deals/calls.</div>
+  <div class="chart-grid">
+    <div class="chart-card" data-metric="sales_calls_held"  data-kind="count" data-type="bar"></div>
+    <div class="chart-card" data-metric="deals_created"     data-kind="count" data-type="bar"></div>
+    <div class="chart-card" data-metric="pipeline"          data-kind="money" data-type="line" data-toggleable="1"></div>
+  </div>
+
+  <div class="section-title">Performance Goals</div>
+  <div class="section-sub">Closed-won + sourcing targets. Pace dot = Ahead/Behind vs how much of the period has elapsed.</div>
+  <div id="goal-cards"></div>
+
+  <div class="section-title">Trailing Indicators</div>
+  <div class="section-sub" id="trailing-sub">What we actually closed.</div>
+  <div class="chart-grid">
+    <div class="chart-card" data-metric="deals_closed"    data-kind="count" data-type="bar"></div>
+    <div class="chart-card" data-metric="value_closed"    data-kind="money" data-type="bar"  data-toggleable="1"></div>
+    <div class="chart-card" data-metric="deals_lost"      data-kind="count" data-type="bar"></div>
+    <div class="chart-card" data-metric="value_lost"      data-kind="money" data-type="bar"  data-toggleable="1"></div>
+    <div class="chart-card" data-metric="avg_deal_size"   data-kind="money" data-type="bar"  data-toggleable="1"></div>
+    <div class="chart-card" data-metric="cumulative"      data-kind="money" data-type="line" data-toggleable="1"></div>
+  </div>
+
+  <div class="section-title">Conversion</div>
+  <div class="section-sub">Win rate = won ÷ (won + lost) over <em>resolved</em> deals — open deals excluded (their outcome is unknown). New-business only; renewals segmented out below.</div>
+  <div id="conversion"></div>
+</div>
+
+<div id="trend-popover"></div>
+
+<script id="conversion-data" type="application/json">__CONVERSION_DATA__</script>
+<script id="trend-data" type="application/json">__TREND_DATA__</script>
+
+<script>
+(function() {
+  const DATA = JSON.parse(document.getElementById('trend-data').textContent);
+  const ICP_LABELS = {}, ICP_TOOLTIPS = {};
+  const TOGGLEABLE = new Set(['pipeline', 'avg_deal_size', 'value_closed', 'value_lost', 'cumulative']);
+  const localState = { meetings_booked: 'first', sales_calls_held: 'first' };
+
+  function titleFor(metric, m) {
+    const word = m.toUpperCase();
+    switch (metric) {
+      case 'sales_calls_held': {
+        const s = localState.sales_calls_held;
+        if (s === 'first')    return 'First sales calls held';
+        if (s === 'followup') return 'Follow-up sales calls held';
+        return 'All sales calls held';
+      }
+      case 'deals_created':   return 'Deals created';
+      case 'pipeline':        return `Open pipeline (${word})`;
+      case 'avg_deal_size':   return `Avg closed-won deal size (${word})`;
+      case 'deals_closed':    return 'Closed-won deals';
+      case 'value_closed':    return `Closed-won deal value (${word})`;
+      case 'deals_lost':      return 'Closed-lost deals';
+      case 'value_lost':      return `Closed-lost deal value (${word})`;
+      case 'cumulative':      return `Cumulative ${word} (all-time)`;
+    }
+    return metric;
   }
+  function footnoteFor(metric, m, view) {
+    const word = m.toUpperCase();
+    const longWord = m === 'arr'
+      ? 'ARR (annualized recurring revenue — first-year value for multi-year deals)'
+      : 'TCV (total contract value — full multi-year sum)';
+    const periodNoun = view === 'weekly' ? 'week' : 'month';
+    const periodEnd  = view === 'weekly' ? 'week-end' : 'month-end';
+    const arrTcvLine = `Currently showing ${longWord}. Toggle ARR/TCV in the top right to switch.`;
+    switch (metric) {
+      case 'sales_calls_held': {
+        const s = localState.sales_calls_held;
+        const align = 'First = the first Gong-recorded sales call on a deal; follow-ups = any later call with that prospect. Internal / investor / hiring calls excluded.';
+        if (s === 'first')    return `First sales calls held per deal. ${align}`;
+        if (s === 'followup') return `Follow-up sales calls (every call after the first on a deal). ${align}`;
+        return `All sales calls — first calls plus follow-ups. ${align}`;
+      }
+      case 'deals_created':
+        return `Deals that entered the pipeline in each ${periodNoun} (earliest HubSpot stage-history transition for the deal).`;
+      case 'pipeline':
+        return `Point-in-time sum of ${word} across deals open at each ${periodEnd} (today for the current ${periodNoun}). ${arrTcvLine}`;
+      case 'avg_deal_size':
+        return `Average ${word} per closed-won deal that ${periodNoun} (total ${word} ÷ deal count). Zero when no closes that ${periodNoun}. ${arrTcvLine}`;
+      case 'deals_closed':
+        return `Count of deals that reached Closed Won, bucketed by close date into each ${periodNoun}.`;
+      case 'value_closed':
+        return `Sum of ${word} for Closed Won deals in each ${periodNoun}, bucketed by close date. ${arrTcvLine}`;
+      case 'deals_lost':
+        return `Count of deals that reached Closed Lost, bucketed by close date into each ${periodNoun}. A leading signal too — a spike flags pipeline-quality problems early.`;
+      case 'value_lost':
+        return `Sum of ${word} for Closed Lost deals in each ${periodNoun}, bucketed by close date — the dollar value that slipped away. ${arrTcvLine}`;
+      case 'cumulative':
+        return `Running total of all-time Closed Won ${word} through each ${periodEnd}. Not filtered to the visible window — earliest closed deals always contribute to the running total. ${arrTcvLine}`;
+    }
+    return '';
+  }
+  let state = { view: 'weekly', rep: 'all', metric: 'arr' };
+
+  function dataKey(metric) {
+    if (TOGGLEABLE.has(metric)) return `${metric}_${state.metric}`;
+    if (metric === 'sales_calls_held')  return `sales_calls_held_${localState.sales_calls_held}`;
+    return metric;
+  }
+
+  function fmtMoney(v) {
+    if (v == null) return '—';
+    const av = Math.abs(v);
+    if (av >= 1000000) return `$${(v/1000000).toFixed(1)}M`;
+    if (av >= 1000)    return `$${(v/1000).toFixed(0)}K`;
+    return `$${v.toFixed(0)}`;
+  }
+  function fmtItemDate(iso) {
+    if (!iso || typeof iso !== 'string') return '';
+    const parts = iso.slice(0, 10).split('-');
+    if (parts.length !== 3) return iso;
+    return `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
+  }
+  function fmtValue(v, kind) { return kind === 'money' ? fmtMoney(v) : String(Math.round(v)); }
+
+  function deltaSub(series, kind) {
+    if (state.view !== 'monthly') return '';
+    if (!series || series.length < 2) return '';
+    const cur = series[series.length - 1].value || 0;
+    const prev = series[series.length - 2].value || 0;
+    if (prev === 0) return `prior month: ${fmtValue(prev, kind)}`;
+    const ch = cur - prev;
+    const pct = Math.abs((ch/prev)*100);
+    const arrow = ch > 0 ? '↑' : (ch < 0 ? '↓' : '→');
+    return `${arrow} ${pct.toFixed(0)}% vs prior month (${fmtValue(prev, kind)})`;
+  }
+
+  function buildSVG(series, kind, type, metric) {
+    const isLost = (metric === 'deals_lost' || metric === 'value_lost');
+    const curColor  = isLost ? 'var(--lost)' : 'var(--core)';
+    const baseColor = isLost ? 'var(--lost)' : 'var(--ink)';
+    const W = 380, H = 140, PAD_L = 8, PAD_R = 8, PAD_B = 22;
+    const PAD_T = type === 'line' ? 22 : 14;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+    const n = series.length;
+    if (!n) return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle" fill="#999" font-size="11">No data</text></svg>`;
+    const maxV = Math.max(1, ...series.map(s => s.value || 0));
+    const gap = 3;
+    const bw = (plotW - gap * (n - 1)) / n;
+    let svg = '';
+    const points = [];
+    for (let i = 0; i < n; i++) {
+      const s = series[i];
+      const v = s.value || 0;
+      const bh = (v / maxV) * plotH;
+      const x = PAD_L + i * (bw + gap);
+      const y = PAD_T + plotH - bh;
+      const isCurrent = (i === n - 1);
+      const color = isCurrent ? curColor : baseColor;
+      const opacity = isCurrent ? '1' : (isLost ? '0.55' : '0.7');
+      const itemsAttr = encodeURIComponent(JSON.stringify(s.items || []));
+      const hoverLabel = s.label_hover || s.label;
+      if (type === 'bar') {
+        svg += `<rect class="trend-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(bh,1).toFixed(1)}" fill="${color}" opacity="${opacity}" data-label="${hoverLabel}" data-value="${fmtValue(v, kind)}" data-items="${itemsAttr}"/>`;
+      } else {
+        points.push([x + bw/2, y, i, s, v, hoverLabel]);
+      }
+      const tx = x + bw / 2, ty = PAD_T + plotH + 14;
+      svg += `<text x="${tx.toFixed(1)}" y="${ty}" text-anchor="middle" font-size="9" font-family="JetBrains Mono, monospace" fill="var(--muted)">${s.label}</text>`;
+      const labelOffset = (type === 'line') ? 10 : 3;
+      const labelY = v > 0 ? (y - labelOffset) : (PAD_T + plotH - 3);
+      svg += `<text x="${tx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" font-family="JetBrains Mono, monospace" fill="var(--ink)" font-weight="${isCurrent ? '700' : '500'}">${fmtValue(v, kind)}</text>`;
+    }
+    if (type === 'line' && points.length) {
+      const pathD = points.map((p, i) => `${i===0?'M':'L'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+      if (points.length >= 2) {
+        const yBase = PAD_T + plotH;
+        const areaD = pathD + ` L ${points[points.length-1][0].toFixed(1)} ${yBase.toFixed(1)} L ${points[0][0].toFixed(1)} ${yBase.toFixed(1)} Z`;
+        svg += `<path d="${areaD}" fill="var(--core)" opacity="0.08"/>`;
+      }
+      svg += `<path d="${pathD}" fill="none" stroke="var(--core)" stroke-width="2" opacity="0.9"/>`;
+      for (const [x, y, i, s, v, hoverLabel] of points) {
+        const isCurrent = (i === n - 1);
+        const r = isCurrent ? 4 : 3;
+        const itemsAttr = encodeURIComponent(JSON.stringify(s.items || []));
+        svg += `<circle class="trend-bar" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="var(--core)" data-label="${hoverLabel}" data-value="${fmtValue(v, kind)}" data-items="${itemsAttr}"/>`;
+      }
+    }
+    return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg>`;
+  }
+
+  function renderCard(card) {
+    const metric = card.dataset.metric;
+    const kind = card.dataset.kind;
+    const type = card.dataset.type;
+    const series = (DATA[state.view][state.rep] || {})[dataKey(metric)] || [];
+    const lastV = series.length ? (series[series.length - 1].value || 0) : 0;
+    const title = titleFor(metric, state.metric);
+    const head = fmtValue(lastV, kind);
+    let sub = deltaSub(series, kind);
+    if (metric === 'cumulative') {
+      sub = `running total of closed-won ${state.metric.toUpperCase()} through ${state.view === 'weekly' ? 'week-end' : 'month-end'}`;
+    }
+    const footnote = footnoteFor(metric, state.metric, state.view);
+    let cardToggle = '';
+    if (metric === 'sales_calls_held') {
+      const cur = localState[metric];
+      const tips = {
+        first:    `Count only the first held call per deal`,
+        followup: `Count only follow-up held calls (exclude the first per deal)`,
+        all:      `Count every held call including first + follow-ups`,
+      };
+      cardToggle = `
+        <div class="card-toggle" role="tablist" aria-label="Scope">
+          <button data-card-toggle="${metric}" data-value="first"    class="${cur === 'first' ? 'active' : ''}"    title="${tips.first}">First</button>
+          <button data-card-toggle="${metric}" data-value="followup" class="${cur === 'followup' ? 'active' : ''}" title="${tips.followup}">Follow-up</button>
+          <button data-card-toggle="${metric}" data-value="all"      class="${cur === 'all' ? 'active' : ''}"      title="${tips.all}">All</button>
+        </div>`;
+    }
+    card.innerHTML = `
+      ${cardToggle}
+      <div class="label">${title}</div>
+      <div class="headline">${head}</div>
+      <div class="sublabel">${sub}</div>
+      ${buildSVG(series, kind, type, metric)}
+      ${footnote ? `<div class="footnote">${footnote}</div>` : ''}
+    `;
+  }
+
+  function fmtMoneyGoal(v) {
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '$' + Math.round(v / 1e3) + 'K';
+    return '$' + Math.round(v).toLocaleString();
+  }
+
+  function renderGoalCards() {
+    const cards = DATA.goal_cards || [];
+    const root  = document.getElementById('goal-cards');
+    if (!root) return;
+    root.innerHTML = '';
+    for (const card of cards) {
+      if (card.missing) continue;
+      const isAll  = state.rep === 'all';
+      const actual = isAll ? (card.actual || 0) : (card.by_rep_actual[state.rep] || 0);
+      const target = isAll ? card.target : (card.by_rep_target[state.rep] || 0);
+      const pctGoal   = target > 0 ? (actual / target) * 100 : 0;
+      const pctPeriod = card.pct_period_elapsed || 0;
+      const ahead     = pctGoal >= pctPeriod;
+      const gap       = Math.max(0, target - actual);
+      const dealsNeeded = card.deal_size_assumption
+        ? Math.ceil(gap / card.deal_size_assumption) : null;
+      const repSuffix = isAll ? '' : ` — ${state.rep}`;
+      const noRepTarget = !isAll && !card.by_rep_target[state.rep];
+
+      const el = document.createElement('div');
+      el.className = 'goal-card';
+      if (noRepTarget) {
+        el.innerHTML = `
+          <div class="goal-title">${card.title}${repSuffix}</div>
+          <div class="goal-sub">${state.rep} doesn't have an explicit ${card.title} target.</div>`;
+      } else {
+        el.innerHTML = `
+          <div class="goal-title">${card.title}${repSuffix}</div>
+          <div class="goal-sub">${card.subtitle}</div>
+          <div class="goal-headline">
+            <div class="goal-big">${fmtMoneyGoal(actual)}</div>
+            <div class="goal-of">/ ${fmtMoneyGoal(target)}</div>
+            <div class="goal-pace pace-${ahead ? 'ahead' : 'behind'}">
+              ${ahead ? '▲ Ahead' : '▼ Behind'} pace
+            </div>
+          </div>
+          <div class="goal-bar">
+            <div class="goal-fill" style="width:${Math.min(100, pctGoal).toFixed(1)}%"></div>
+            <div class="goal-marker" style="left:${Math.min(100, pctPeriod).toFixed(1)}%"
+                 title="${pctPeriod.toFixed(0)}% of period elapsed"></div>
+          </div>
+          <div class="goal-row">
+            <div><span class="goal-label">% to goal</span><span class="goal-val">${pctGoal.toFixed(1)}%</span></div>
+            <div><span class="goal-label">% period elapsed</span><span class="goal-val">${pctPeriod.toFixed(1)}%</span></div>
+            <div><span class="goal-label">$ to go</span><span class="goal-val">${fmtMoneyGoal(gap)}</span></div>
+            ${dealsNeeded != null ? `
+              <div><span class="goal-label">deals needed</span><span class="goal-val">${dealsNeeded}</span><span class="goal-sublabel">@ $${(card.deal_size_assumption/1000).toFixed(0)}K avg</span></div>
+            ` : ''}
+          </div>`;
+      }
+      root.appendChild(el);
+    }
+  }
+
+  function render() {
+    document.querySelectorAll('.chart-card[data-metric]').forEach(renderCard);
+    renderGoalCards();
+    const periodLabel = state.view === 'weekly' ? 'last 8 full weeks + this week-to-date' : 'every month since Jan 1 + month-to-date';
+    const filterSuffix = state.rep === 'all' ? '' : ` Filtered to ${state.rep}.`;
+    document.getElementById('leading-sub').textContent = `Top-of-funnel activity. Showing ${periodLabel}.${filterSuffix}`;
+    document.getElementById('trailing-sub').textContent = `Closed-won outcomes. Showing ${periodLabel}.${filterSuffix}`;
+  }
+
+  // ── Hover popover ────────────────────────────────────────────────────────
+  const pop = document.getElementById('trend-popover');
+  let hideTimer = null;
+  function showPop(target) {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    const label = target.dataset.label || '';
+    const value = target.dataset.value || '';
+    let items = [];
+    try { items = JSON.parse(decodeURIComponent(target.dataset.items || '%5B%5D')); } catch (e) {}
+    let html = `<div class="tp-week">${label}</div>`;
+    html += `<div class="tp-value">${value}</div>`;
+    if (items.length) {
+      const hasSource = items.some(it => it.source);
+      if (hasSource) {
+        const counts = {};
+        for (const it of items) {
+          const s = it.source || 'Unknown';
+          counts[s] = (counts[s] || 0) + 1;
+        }
+        const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        html += '<div class="tp-breakdown"><div class="tp-section-label">Source breakdown</div>';
+        for (const [src, n] of ranked) {
+          html += `<div class="tp-bd-row"><span class="tp-bd-name">${src}</span><span class="tp-bd-count">${n}</span></div>`;
+        }
+        html += '</div>';
+        html += '<div class="tp-section-label">All items</div>';
+      }
+      html += '<div class="tp-items">';
+      for (const it of items) {
+        const datePrefix = it.date ? `${fmtItemDate(it.date)} · ` : '';
+        const labelText = it.label || '';
+        let labelHTML = labelText;
+        const gongHref = it.gong_url || (it.gong_id ? `https://us-26175.app.gong.io/call?id=${it.gong_id}` : '');
+        const hsHref = it.hubspot_url || (it.hubspot_deal_id ? `https://app.hubspot.com/contacts/deals/${it.hubspot_deal_id}` : '');
+        if (gongHref) {
+          labelHTML = `<a class="tp-ext-link" href="${gongHref}" target="_blank" rel="noopener">${labelText}</a>`;
+        } else if (hsHref) {
+          labelHTML = `<a class="tp-ext-link" href="${hsHref}" target="_blank" rel="noopener">${labelText}</a>`;
+        }
+        const sub = it[`sublabel_${state.metric}`] || it.sublabel || '';
+        let bantHTML = '';
+        const bits = [];
+        if (it.bant && it.bant.score != null) {
+          const s = it.bant.score;
+          const tier = s >= 70 ? 'hi' : s >= 40 ? 'mid' : 'lo';
+          bits.push(`<span class="tp-bant-score tier-${tier}">BANT: ${s}</span>`);
+        }
+        if (it.icp_fit) {
+          const lbl = ICP_LABELS[it.icp_fit] || it.icp_fit;
+          const def = (ICP_TOOLTIPS[it.icp_fit] || '').replace(/"/g, '&quot;');
+          bits.push(`<span class="tp-icp-pill icp-${it.icp_fit}" title="${def}">${lbl}</span>`);
+        }
+        if (it.bant && it.bant.icp) {
+          const icpClean = it.bant.icp.replace(/^T\d+\s*[—–\-·]\s*/, '');
+          if (icpClean) bits.push(`<span class="tp-bant-icp">${icpClean}</span>`);
+        }
+        if (bits.length) {
+          bantHTML = `<div class="tp-bant-line">${bits.join('')}</div>`;
+        }
+        html += `<div class="tp-item"><div class="name">${labelHTML}</div>`;
+        if (datePrefix || sub) {
+          html += `<div class="sub">${datePrefix}${sub}</div>`;
+        }
+        html += bantHTML;
+        html += '</div>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="tp-empty">No items.</div>';
+    }
+    pop.innerHTML = html;
+    pop.classList.add('open');
+    const r = target.getBoundingClientRect();
+    let left = r.right + window.scrollX + 8;
+    let top  = r.top   + window.scrollY;
+    const popW = 400, popH = pop.offsetHeight || 320;
+    if (left + popW > window.scrollX + window.innerWidth - 12) left = r.left + window.scrollX - popW - 8;
+    if (top + popH > window.scrollY + window.innerHeight - 12) top = window.scrollY + window.innerHeight - popH - 12;
+    if (top < window.scrollY + 8) top = window.scrollY + 8;
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+  }
+  function hidePopSoon() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => pop.classList.remove('open'), 300);
+  }
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target.closest('.trend-bar');
+    if (t) showPop(t);
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (e.target.closest('.trend-bar')) hidePopSoon();
+  });
+  pop.addEventListener('mouseenter', () => {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  });
+  pop.addEventListener('mouseleave', hidePopSoon);
+
+  // ── Toggle wiring ───────────────────────────────────────────────────────
+  document.querySelectorAll('.toggle-group button[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.toggle-group button[data-view]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.view = btn.dataset.view;
+      render();
+    });
+  });
+  document.querySelectorAll('.toggle-group button[data-metric]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.toggle-group button[data-metric]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.metric = btn.dataset.metric;
+      render();
+    });
+  });
+  document.querySelectorAll('#rep-toggle button[data-rep]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#rep-toggle button[data-rep]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.rep = btn.dataset.rep;
+      render();
+    });
+  });
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-card-toggle]');
+    if (!btn) return;
+    const key = btn.dataset.cardToggle;
+    const value = btn.dataset.value;
+    if (!key || !value) return;
+    localState[key] = value;
+    render();
+  });
+
+  render();
+  renderConversion();
+})();
+
+// ── Conversion section (static — cohorts + per-rep table) ───────────────────
+function renderConversion() {
+  const root = document.getElementById('conversion');
+  if (!root) return;
+  let C;
+  try { C = JSON.parse(document.getElementById('conversion-data').textContent); }
+  catch { return; }
+  if (!C || !C.cohorts) return;
+
+  const wr = (v) => v == null ? '—' : v + '%';
+
+  const cohortRows = C.cohorts.map(c => {
+    const pct = c.win_rate == null ? 0 : c.win_rate;
+    const w = Math.round((pct / 100) * 100);
+    return `<div class="cohort-row ${c.maturing ? 'maturing' : ''}" title="${c.label}: ${c.won} won / ${c.lost} lost / ${c.open} still open — of ${c.created} created${c.maturing ? '  (still maturing — not all resolved yet)' : ''}">
+      <div class="mlabel">${c.label}</div>
+      <div class="cohort-track"><div class="cohort-fill ${c.maturing ? 'maturing' : ''}" style="width:${w}%;"></div></div>
+      <div class="cstat"><b>${wr(c.win_rate)}</b> · ${c.won}/${c.won + c.lost}</div>
+    </div>`;
+  }).join('');
+
+  const repRows = C.by_rep.map(r => {
+    const a = r.alltime, t = r.t90;
+    return `<tr>
+      <td>${r.rep.split(' ')[0]}</td>
+      <td>${a.won}</td><td>${a.lost}</td><td>${a.open}</td>
+      <td><span class="wr">${wr(a.win_rate)}</span></td>
+      <td>${wr(t.win_rate)}</td>
+    </tr>`;
+  }).join('');
+  const rn = C.renewals;
+  const renewalRow = (rn && (rn.won + rn.lost + rn.open) > 0)
+    ? `<tr class="renewals"><td>Renewals*</td><td>${rn.won}</td><td>${rn.lost}</td><td>${rn.open}</td><td>${wr(rn.win_rate)}</td><td>—</td></tr>`
+    : '';
+
+  root.innerHTML = `
+    <div class="conv-card">
+      <h3>Win rate by deal-creation cohort</h3>
+      <div class="sub">Of the new-business deals we <em>opened</em> each month, the share of resolved ones we won. 🟡 = still maturing (younger than the ${C._meta.mature_days}-day p90 sales cycle, so some deals haven't resolved).</div>
+      ${cohortRows}
+    </div>
+    <div class="conv-card">
+      <h3>Win rate by rep</h3>
+      <div class="sub">New-business only, resolved deals. Counts shown because samples are small — read the numbers, not just the percentage.</div>
+      <table class="conv-tbl">
+        <thead><tr><th>Rep</th><th>Won</th><th>Lost</th><th>Open</th><th>Win rate</th><th>90d</th></tr></thead>
+        <tbody>${repRows}${renewalRow}</tbody>
+      </table>
+      <div class="conv-foot">
+        *Renewals/expansions segmented out of every rate above.<br>
+        Win rate excludes open deals. "90d" = trailing-90-day resolved win rate.
+      </div>
+    </div>`;
 }
-boot();
 </script>
 """
 
@@ -354,8 +797,8 @@ TEMPLATE = r"""<!doctype html>
 --core:#3a6a3a;--core-bg:#d4e4cb;
 --green:#3a6a3a;--green-bg:#d4e4cb;--amber:#8a6300;--amber-bg:#f4eedd;--red:#b42318;--red-bg:#fbeae9;
 --shadow-sm:none;--shadow:0 1px 0 rgba(43,43,43,.04);
---radius:4px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#2f6f8f;--demo-bg:#ecf2f5;--quote:#8a6300;--quote-bg:#f4eedd;
---verbal:#c0397f;--verbal-bg:#fbe9f2;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
+--radius:4px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#0f8aa3;--demo-bg:#e1f1f5;--quote:#8a6300;--quote-bg:#f4eedd;
+--verbal:#b5179e;--verbal-bg:#f7e4f3;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Fraunces',Georgia,serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-0.004em}
 .tnum,.ktag,.kf-src,.engtag,.tbadge,.kf-l{font-family:'JetBrains Mono',monospace}
