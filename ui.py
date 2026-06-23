@@ -875,6 +875,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .stbl .gy{color:var(--green);font-weight:700}.stbl .gn{color:var(--line);font-weight:600}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
+.tier.inf{opacity:.92;box-shadow:inset 0 -2px 0 rgba(255,255,255,.45)}
 /* ===== In-deal view: SOP-driven stage checklist (rebuilt 2026-06-23) ===== */
 .dv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:16px 0 4px}
 .dv-head .co{font-size:23px;font-weight:700;letter-spacing:-.01em}
@@ -1357,9 +1358,14 @@ const TIER_TAG={1:'T1 · PRIME',2:'T2 · OTHER',3:'T3 · DIST',4:"T4 · DON'T"};
 const STAGE_RUBRIC={'1090549665':'disc','1090549667':'roi','1104822108':'prop','1329839734':'prop','1090549670':'prop','1090549671':null};
 const GATE_SHORT={d_tools:'Tools',d_pain:'Pain',d_decision:'Decision',d_budget:'Budget',d_qualify:'Qualified',m_dm:'DM present',m_demo_delivered:'Demo',m_annual_cost:'$ Cost',m_scope:'Scope',m_next:'Next call',p_dm_present:'DM',p_obj:'Objections',p_price:'Pricing',p_arlen:'Arlen',p_commit:'Commit',p_onboard:'Onboard'};
 function titleCase(s){return String(s||'').toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
-function dealVertical(d){return QUINN_VERT[d.vertical_quinn]||'—';}
-function dealTier(d){const v=QUINN_VERT[d.vertical_quinn];return v?ICP_TIERS[v]:null;}
-function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="Vertical not set on the HubSpot contact — pending website-scrape categorization (SOP §B)">—</span>';return `<span class="tier t${t}" title="${esc(QUINN_VERT[d.vertical_quinn]||'')}">${TIER_TAG[t]}</span>`;}
+function dealVerticalName(d){const cv=QUINN_VERT[d.vertical_quinn];if(cv)return cv;if(d.vertical_inferred&&ICP_TIERS[d.vertical_inferred])return d.vertical_inferred;return null;}
+function isInferredVert(d){return !QUINN_VERT[d.vertical_quinn]&&!!(d.vertical_inferred&&ICP_TIERS[d.vertical_inferred]);}
+function dealVertical(d){return dealVerticalName(d)||'—';}
+function dealTier(d){const v=dealVerticalName(d);return v?ICP_TIERS[v]:null;}
+function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="No vertical on the HubSpot contact and the website could not be read — pending categorization (SOP §B)">—</span>';
+  const inf=isInferredVert(d);const m=d.vertical_inferred_meta||{};
+  const title=inf?`${dealVerticalName(d)} — inferred from website (${m.confidence||'?'} confidence): ${(m.evidence||'').replace(/"/g,'')}`:(dealVerticalName(d)||'');
+  return `<span class="tier t${t}${inf?' inf':''}" title="${esc(title)}">${TIER_TAG[t]}${inf?' ~':''}</span>`;}
 function discoveryDate(d){
   // The discovery date is never empty: prefer the actual discovery call, then the
   // earliest real meeting on the deal, then the stage-entry timestamp. (Fixes the
@@ -1474,7 +1480,7 @@ function stepStage(d){
 }
 function hasCall(d){return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
 function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id)||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
-function hasOutEmail(d){return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||''));}
+function hasOutEmail(d){const dd=discoveryDate(d);const t0=dd?new Date(dd).getTime():0;return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||'')&&(!t0||(e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>=t0-3600000)));}
 function stepDone(d,st){const ov=(dst(d.id).steps||{})[st.k];if(ov===true||ov===false)return ov;return st.auto?!!st.auto(d):false;}
 function toggleStep(id,k,eff){const s=dst(id);s.steps=s.steps||{};s.steps[k]=!eff;save(id,s);renderDeal(id);}
 function prepBlock(d){

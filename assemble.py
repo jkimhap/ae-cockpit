@@ -5,7 +5,7 @@ full=False : pull HubSpot live (fast, the freshness path) and REUSE cached Gong/
 The payload shape matches ui.py's renderer.
 """
 import os, json, re, datetime
-import hubspot as hs, gong, ai, rubric, tasks
+import hubspot as hs, gong, ai, rubric, tasks, categorize as catz
 from config import CACHE_DIR
 
 GONG_URL = "https://us-26175.app.gong.io/call?id={}"   # workspace deep-link
@@ -40,6 +40,22 @@ def _load(name, default):
         try: return json.load(open(p))
         except Exception: return default
     return default
+
+def _infer_vertical(domain, cid, company, full):
+    """Cache-first ICP vertical inference from the company website. Reads the local
+    vertical_cache (free, used on every fast refresh); on a FULL sync, classifies and
+    fills the cache for any company not seen yet. Never writes to HubSpot."""
+    if not domain:
+        return {}
+    key = catz._safe_key(catz._clean_domain(domain) or str(cid))
+    cp = os.path.join(CACHE_DIR, "vertical_cache", f"{key}.json")
+    if os.path.exists(cp):
+        try: return json.load(open(cp))
+        except Exception: return {}
+    if full:
+        try: return catz.categorize(cid, company, domain, CACHE_DIR)
+        except Exception: return {}
+    return {}
 
 def assemble(rep, full=True, log=print):
     owner = hs.resolve_owner(rep)
@@ -141,6 +157,10 @@ def assemble(rep, full=True, log=print):
             iv = ((contacts.get(cid, {}) or {}).get("industry_category") or "").strip()
             if iv and iv not in ("unknown","other"):
                 vertical_quinn = iv; break
+        # If the contact has no Quinn vertical, infer it from the website (cache-first).
+        co_domain = (co.get("domain") or "").lower()
+        co_name = co.get("name") or _name_from(p.get("dealname"))
+        vinf = _infer_vertical(co_domain, did, co_name, full) if not vertical_quinn else {}
 
         # emails
         elist = []
@@ -186,7 +206,8 @@ def assemble(rep, full=True, log=print):
                 "amount":_num(p.get("amount")),"arr":_num(p.get("amount")),
                 "source":(p.get("hs_analytics_source_data_1") or p.get("hs_analytics_source") or "—"),
                 "dealtype":p.get("dealtype") or "newbusiness",
-                "industry":co.get("industry_category") or co.get("industry") or "","vertical_quinn":vertical_quinn,"employees":_num(co.get("numberofemployees")),
+                "industry":co.get("industry_category") or co.get("industry") or "","vertical_quinn":vertical_quinn,
+                "vertical_inferred":(vinf or {}).get("vertical") or "","vertical_inferred_meta":vinf or {},"employees":_num(co.get("numberofemployees")),
                 "locations":co.get("numberoflocations") or "","icp":"",
                 "company_desc":co.get("description") or "","website":co.get("website") or "",
                 "company_linkedin":co.get("linkedin_company_page") or "",
