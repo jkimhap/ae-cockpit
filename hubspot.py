@@ -102,8 +102,10 @@ def companies_for(ids):
          "city","state","numberoflocations","description","website","linkedin_company_page"])
 
 def contacts_for(ids):
+    # industry_category = the CONTACT "Industry (Quinn)" property — the real ICP vertical.
+    # (The HubSpot company `industry` enum is coarse/useless and is not used for vertical/tier.)
     return batch_read("contacts", ids,
-        ["firstname","lastname","email","jobtitle","phone"])
+        ["firstname","lastname","email","jobtitle","phone","industry_category"])
 
 def calls_for(ids):
     return batch_read("calls", ids,

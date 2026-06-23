@@ -874,7 +874,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .stbl td.gc{text-align:center;font-size:14px}
 .stbl .gy{color:var(--green);font-weight:700}.stbl .gn{color:var(--line);font-weight:600}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
-.tier.t1{color:#fff;background:var(--green)}.tier.t2{color:#fff;background:var(--accent-ink)}.tier.t3{color:var(--ink);background:var(--amber-bg);border:1px solid var(--amber)}.tier.t4{color:var(--muted);background:var(--panel2);border:1px solid var(--line)}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
+.tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;background:#fff;border:1px solid var(--line2);color:var(--muted)}
 .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .st-Discovery{color:var(--disc);background:var(--disc-bg);border-color:var(--disc-bg)}.st-Demo{color:var(--demo);background:var(--demo-bg);border-color:var(--demo-bg)}.st-Quote{color:var(--quote);background:var(--quote-bg);border-color:var(--quote-bg)}.st-Verbal{color:var(--verbal);background:var(--verbal-bg);border-color:var(--verbal-bg)}.st-Won{color:var(--won);background:var(--won-bg);border-color:var(--won-bg)}.st-Lost{color:var(--lost);background:var(--lost-bg);border-color:var(--lost-bg)}
@@ -1288,39 +1288,55 @@ function fRl(label,x,n){const st=x>=n?'ok':(x>0?'warn':'bad');return `<div class
 /* ---------- per-stage TABLE (replaces deal cards inside a selected stage) ----------
    Columns: Company · Tier · Vertical · Value · Days since discovery · Days in stage ·
    Contact, then one ✓/— column per ENTRY GATE of that stage (named from the SOP rubric).
-   Row click → the deal's full workspace.  NB: HubSpot industry_category is coarse, so Tier
-   is a best-effort crosswalk; the precise vertical/tier is Rita's job per SOP §B (nearest ICP
-   vertical from the company description) — unmapped industries show the raw vertical, Tier "—". */
+   Row click → the deal's full workspace.  Vertical/Tier source (per Johnny, 2026-06-23):
+   the HubSpot *industry* enum is useless and is NOT used. Vertical comes from the HubSpot
+   CONTACT property "Industry (Quinn)" (internal name industry_category) → `d.vertical_quinn`,
+   mapped to the canonical ICP Rubric vertical via QUINN_VERT; Tier is then looked up from the
+   ICP Rubric ("ICP Rubric" tab → icp-tiers.json). When the contact property is empty the
+   website-scrape categorizer skill fills it (SOP §B); until then Tier shows "—". */
 const ICP_TIERS=__ICP_TIERS__;
-const HS_TO_ICP={
-  FACILITIES_SERVICES:'Facilities Maintenance',
-  CONSTRUCTION:'General & Residential Construction',
-  MECHANICAL_OR_INDUSTRIAL_ENGINEERING:'Mechanical Construction',
-  HOSPITALITY:'Hospitality & Amusement',LEISURE_TRAVEL_TOURISM:'Hospitality & Amusement',EVENTS_SERVICES:'Hospitality & Amusement',
-  HOSPITAL_HEALTH_CARE:'Healthcare',PHARMACEUTICALS:'Healthcare',
-  MEDICAL_DEVICES:'Biomedical Equipment Service',
-  RESTAURANTS:'Food Service',FOOD_PRODUCTION:'Food Service',
-  LOGISTICS_AND_SUPPLY_CHAIN:'Warehousing, Logistics & Distribution',
-  SECURITY_AND_INVESTIGATIONS:'Security Guard Services',
-  OIL_ENERGY:'Energy with HVAC Team',UTILITIES:'Energy with HVAC Team',
-  MACHINERY:'Manufacturers & Distributors',ELECTRICAL_ELECTRONIC_MANUFACTURING:'Manufacturers & Distributors',
-  BUSINESS_SUPPLIES_AND_EQUIPMENT:'Manufacturers & Distributors',CONSUMER_GOODS:'Manufacturers & Distributors',
-  CONSUMER_ELECTRONICS:'Manufacturers & Distributors',FURNITURE:'Manufacturers & Distributors',
-  ONLINE_MEDIA:'SaaS'
+/* HubSpot CONTACT industry_category VALUE -> canonical ICP Rubric vertical (icp-tiers.json key). */
+const QUINN_VERT={
+  auto_repair__service:'Auto Repair & Service',
+  automation__controls:'Automation & Controls',
+  biomedical_equipment_service:'Biomedical Equipment Service',
+  car_wash:'Car Wash',
+  residential_cleaning:'Janitorial & Cleaning',
+  commercial_kitchen_equipment_service:'Commercial Kitchen Equipment',
+  distribution__wholesale:'Manufacturers & Distributors',
+  electrical_services:'Electrical',
+  hvac__energy_services:'Energy with HVAC Team',
+  facilities_maintenance:'Facilities Maintenance',
+  fire_protection_low_voltage__security:'Fire, Low Voltage & Security',
+  general_construction:'General & Residential Construction',
+  hvac_service_provider:'HVAC Service Provider',
+  industry_association:'Industry Associations',
+  landscaping_lawn__irrigation:'Landscaping, Lawn & Irrigation',
+  manufacturing__industrial:'Manufacturers & Distributors',
+  mechanical_construction:'Mechanical Construction',
+  pest_control:'Pest Control',
+  plumbing:'Plumbing',
+  refrigeration:'Refrigeration',
+  restaurants__hospitality:'Hospitality & Amusement',
+  restoration:'Restoration',
+  roofing__exteriors:'Roofing',
+  trade_school:'Trade Schools',
+  waste__recycling:'Waste & Recycling',
+  water_treatment_pool_service:'Water Treatment & Pool'
 };
 const TIER_TAG={1:'T1 · PRIME',2:'T2 · OTHER',3:'T3 · DIST',4:"T4 · DON'T"};
 const STAGE_RUBRIC={'1090549665':'disc','1090549667':'roi','1104822108':'prop','1329839734':'prop','1090549670':'prop','1090549671':null};
 const GATE_SHORT={d_tools:'Tools',d_pain:'Pain',d_decision:'Decision',d_budget:'Budget',d_qualify:'Qualified',m_dm:'DM present',m_demo_delivered:'Demo',m_annual_cost:'$ Cost',m_scope:'Scope',m_next:'Next call',p_dm_present:'DM',p_obj:'Objections',p_price:'Pricing',p_arlen:'Arlen',p_commit:'Commit',p_onboard:'Onboard'};
 function titleCase(s){return String(s||'').toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
-function dealVertical(d){return HS_TO_ICP[d.industry]||(d.industry?titleCase(d.industry):'—');}
-function dealTier(d){const v=HS_TO_ICP[d.industry];return v?ICP_TIERS[v]:null;}
-function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="tier pending ICP-vertical mapping — Rita derives it per SOP §B">—</span>';return `<span class="tier t${t}" title="${esc(HS_TO_ICP[d.industry]||'')}">${TIER_TAG[t]}</span>`;}
+function dealVertical(d){return QUINN_VERT[d.vertical_quinn]||'—';}
+function dealTier(d){const v=QUINN_VERT[d.vertical_quinn];return v?ICP_TIERS[v]:null;}
+function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="Vertical not set on the HubSpot contact — pending website-scrape categorization (SOP §B)">—</span>';return `<span class="tier t${t}" title="${esc(QUINN_VERT[d.vertical_quinn]||'')}">${TIER_TAG[t]}</span>`;}
 function daysSinceDisc(d){const cs=(d.timeline||[]).filter(e=>e.kind==='call').map(e=>e.ts).filter(Boolean).sort();if(!cs.length)return null;const t0=new Date(cs[0]).getTime();if(isNaN(t0))return null;return Math.max(0,Math.round((Date.now()-t0)/86400000));}
 function gateMet(d,iid){if(isCap(d.id,iid))return true;const af=d.ai_fields||{};return !!(af[iid]&&af[iid].value);}
 function stageGates(stage_id){const k=STAGE_RUBRIC[stage_id];if(!k)return [];const s=D.rubric.find(x=>x.key===k);return s?(s.items||[]).filter(it=>it.gate):[];}
 function stageTable(f){
   const gates=stageGates(f.stage_id);
-  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Value</th><th class="num">Since disc.</th><th class="num">In stage</th><th>Contact</th>${gates.map(g=>`<th class="gcol" title="${esc(g.label)} — stage entry gate">${esc(GATE_SHORT[g.id]||g.label)}</th>`).join('')}</tr>`;
+  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Deal Size</th><th class="num">Since disc.</th><th class="num">In stage</th><th>Contact</th>${gates.map(g=>`<th class="gcol" title="${esc(g.label)} — stage entry gate">${esc(GATE_SHORT[g.id]||g.label)}</th>`).join('')}</tr>`;
   const rows=f.deals.map(d=>{
     const c=d.primary_contact||{};const dd=daysSinceDisc(d);
     const dis=(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—';
@@ -1565,7 +1581,7 @@ function factsSection(d){
     </div></div>`;
 }
 function factsBox(d){const c=d.primary_contact||{};
-  const rows=[['Stage',esc(d.stage)],['Value',money(d.arr||d.amount)],['Industry',esc(d.industry||'—')],['Employees',d.employees||'—'],['Source',esc(d.source||'—')],['Days in stage',(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—'],['Primary contact',c.name?esc(c.name+(c.title?' · '+c.title:'')):'—']];
+  const rows=[['Stage',esc(d.stage)],['Deal Size',money(d.arr||d.amount)],['Vertical',esc(dealVertical(d))],['Employees',d.employees||'—'],['Source',esc(d.source||'—')],['Days in stage',(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—'],['Primary contact',c.name?esc(c.name+(c.title?' · '+c.title:'')):'—']];
   return `<div class="factbox"><h3>Key facts</h3><div class="kv">${rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('')}</div></div>`;
 }
 

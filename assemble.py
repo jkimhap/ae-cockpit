@@ -133,6 +133,15 @@ def assemble(rep, full=True, log=print):
         stake = list(stake.values())
         primary = next((s for s in stake if SENIOR.search(s.get("title") or "")), stake[0] if stake else {})
 
+        # Vertical (Quinn ICP): the CONTACT "Industry (Quinn)" property (industry_category).
+        # Take the first contact with a real value; "unknown"/"other" count as empty so the
+        # website-scrape categorizer skill fills it later (SOP §B). NOT the company industry enum.
+        vertical_quinn = ""
+        for cid in a_ct.get(did, []):
+            iv = ((contacts.get(cid, {}) or {}).get("industry_category") or "").strip()
+            if iv and iv not in ("unknown","other"):
+                vertical_quinn = iv; break
+
         # emails
         elist = []
         for eid in a_em.get(did, []):
@@ -177,7 +186,7 @@ def assemble(rep, full=True, log=print):
                 "amount":_num(p.get("amount")),"arr":_num(p.get("amount")),
                 "source":(p.get("hs_analytics_source_data_1") or p.get("hs_analytics_source") or "—"),
                 "dealtype":p.get("dealtype") or "newbusiness",
-                "industry":co.get("industry_category") or co.get("industry") or "","employees":_num(co.get("numberofemployees")),
+                "industry":co.get("industry_category") or co.get("industry") or "","vertical_quinn":vertical_quinn,"employees":_num(co.get("numberofemployees")),
                 "locations":co.get("numberoflocations") or "","icp":"",
                 "company_desc":co.get("description") or "","website":co.get("website") or "",
                 "company_linkedin":co.get("linkedin_company_page") or "",
