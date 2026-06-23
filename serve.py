@@ -11,7 +11,7 @@ Run:  quinn-os/.venv/bin/python3 serve.py     (or use ./run)
 import json, os, sys, time, threading, urllib.parse, gzip
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import load_env, CACHE_DIR
+from config import load_env, CACHE_DIR, REPS
 load_env()
 import assemble, ui, tasks
 
@@ -40,11 +40,12 @@ def cached_payload(rep):
         return assemble.assemble(rep, full=True)
 
 def dashboard_data():
-    """Cross-AE feed for the Dashboard tab: load whichever of the grant/arlen
-    cached payloads exist (skip a missing one gracefully — never crash, never
-    trigger a cold assemble). The client merges and computes from this."""
+    """Cross-AE feed for the Dashboard tab: load whichever rep cached payloads
+    exist (skip a missing one gracefully — never crash, never trigger a cold
+    assemble). New reps light up automatically as their sync lands. The client
+    merges and computes from this."""
     out = {}
-    for rep in ("grant", "arlen"):
+    for rep in REPS:
         p = os.path.join(CACHE_DIR, f"payload-{rep}.json")
         try:
             out[rep] = json.load(open(p)) if os.path.exists(p) else None
