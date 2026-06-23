@@ -15,8 +15,8 @@ TEMPLATE = r"""<!doctype html>
 --line:#ededf0;--line2:#e3e4e8;--accent:#17191e;--accent-soft:#eef1f3;--accent-ink:#2f6f8f;
 --green:#127a4f;--green-bg:#eaf3ee;--amber:#8a6300;--amber-bg:#f4eedd;--red:#b42318;--red-bg:#fbeae9;
 --shadow-sm:0 1px 2px rgba(23,25,30,.04);--shadow:0 6px 22px rgba(23,25,30,.07);
---radius:10px;--disc:#6e59c0;--disc-bg:#f1eff9;--demo:#2f6f8f;--demo-bg:#ecf2f5;--quote:#8a6300;--quote-bg:#f4eedd;
---verbal:#4f51b3;--verbal-bg:#eeeef8;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
+--radius:10px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#2f6f8f;--demo-bg:#ecf2f5;--quote:#8a6300;--quote-bg:#f4eedd;
+--verbal:#c0397f;--verbal-bg:#fbe9f2;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-0.006em}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}a{color:inherit}.tnum{font-variant-numeric:tabular-nums}
@@ -45,7 +45,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .fstage{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;cursor:pointer;transition:.13s;position:relative;overflow:hidden}
 .fstage:hover{box-shadow:var(--shadow);transform:translateY(-1px)}.fstage.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fstage.synthetic{border-style:dashed;background:var(--panel2)}
-.fstage .fb{position:absolute;left:0;top:0;height:3px;width:100%}
+.fstage .fb{position:absolute;left:0;top:0;height:4px;width:100%}
 .fstage .lab{font-size:11.5px;font-weight:600;color:var(--muted)}.fstage .n{font-size:28px;font-weight:600;letter-spacing:-0.03em;margin-top:6px}
 .fstage .arr{color:var(--faint);font-size:11.5px;margin-top:2px;font-weight:500}
 .frollup{margin-top:9px;display:flex;flex-direction:column;gap:3px}
@@ -63,7 +63,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .card .prog{margin-top:11px}.card .alerts{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;background:#fff;border:1px solid var(--line2);color:var(--muted)}
 .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.st-Discovery{color:var(--disc)}.st-Demo{color:var(--demo)}.st-Quote{color:var(--quote)}.st-Verbal{color:var(--verbal)}.st-Won{color:var(--won)}.st-Lost{color:var(--lost)}
+.st-Discovery{color:var(--disc);background:var(--disc-bg);border-color:var(--disc-bg)}.st-Demo{color:var(--demo);background:var(--demo-bg);border-color:var(--demo-bg)}.st-Quote{color:var(--quote);background:var(--quote-bg);border-color:var(--quote-bg)}.st-Verbal{color:var(--verbal);background:var(--verbal-bg);border-color:var(--verbal-bg)}.st-Won{color:var(--won);background:var(--won-bg);border-color:var(--won-bg)}.st-Lost{color:var(--lost);background:var(--lost-bg);border-color:var(--lost-bg)}
 .dcs{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;padding:3px 9px;border-radius:6px;background:#fff;border:1px solid var(--line2);color:var(--faint)}.dcs .d{width:6px;height:6px;border-radius:50%;background:currentColor}
 .dcs.green{color:var(--green)}.dcs.yellow{color:var(--amber)}.dcs.red{color:var(--red)}.dcs.gray{color:var(--faint)}
 .flag{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;padding:4px 9px;border-radius:6px;line-height:1.35;border-left:2px solid currentColor}.flag.high{background:var(--red-bg);color:var(--red)}.flag.med{background:var(--amber-bg);color:var(--amber)}
@@ -163,7 +163,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .spin{width:15px;height:15px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}@keyframes sp{to{transform:rotate(360deg)}}
 .hide{display:none!important}
 /* ===== SalesOS two-pane shell (Phase 0) ===== */
-.shell{display:grid;grid-template-columns:380px 1fr;align-items:stretch;min-height:calc(100vh - 53px)}
+.shell{display:grid;grid-template-columns:1fr;align-items:stretch;min-height:calc(100vh - 53px)}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.inbox{display:none}.inbox.mobile-on{display:flex}}
 .inbox{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);position:sticky;top:53px;height:calc(100vh - 53px);overflow:hidden}
 .inbox-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
@@ -291,19 +291,11 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 <header class="topbar">
   <div class="brand"><span class="dot"></span><b>Quinn</b><span>SalesOS Cockpit</span><span class="who" id="repName">…</span></div>
   <span class="sp"></span>
-  <button class="rfx ghost ibtoggle" onclick="$('#inbox').classList.toggle('mobile-on')" title="Toggle Task Inbox">☰ Inbox</button>
   <span class="engine none" id="engine">—</span><span class="refreshed" id="refreshed"></span>
   <button class="rfx" id="rbtn" onclick="refresh(false)">↻ Refresh</button>
   <button class="rfx ghost" id="rfull" onclick="refresh(true)" title="Re-pull Gong + regenerate AI">⟳ Full sync</button>
 </header>
 <div class="shell">
-  <aside class="inbox" id="inbox">
-    <div class="inbox-h">
-      <div class="ti">Task Inbox <span class="cnt" id="inboxCount">—</span></div>
-      <div class="note"><b>⚠</b><span>Tasks are <b style="color:var(--amber)">derived heuristically</b> from current deal state — not yet event-driven (Phase 2).</span></div>
-    </div>
-    <div class="inbox-list" id="inboxList"><div class="empty">Loading…</div></div>
-  </aside>
   <div class="workspace"><main class="main" id="view"><div class="loading"><span class="spin"></span> Loading live HubSpot data…</div></main></div>
 </div>
 <div class="pop" id="pop"></div>
@@ -335,7 +327,7 @@ async function refresh(full,silent){if(refreshing)return;refreshing=true;$('#rbt
 function hydrate(){$('#repName').textContent=D.rep;$('#refreshed').textContent='HubSpot '+ago(D.refreshed);
   const e=$('#engine');e.className='engine '+(D.ai_engine||'none');e.innerHTML='<span class="ed"></span>'+(D.ai_engine==='claude'?'Claude':D.ai_engine==='heuristic'?'Heuristic':'No AI');
   e.title=D.ai_engine==='heuristic'?'Anthropic key out of credits — add credits then Full sync to upgrade to Claude':'';
-  renderInbox();}
+  }
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2600);}
 window.addEventListener('hashchange',route);
 function route(){if(!D)return;const h=location.hash||'#/';if(h.startsWith('#/deal/'))renderDeal(h.slice(7));else renderMain();window.scrollTo(0,0);}
@@ -406,7 +398,8 @@ function dealCard(d){
     ${alertFlags(d)?`<div class="alerts">${alertFlags(d)}</div>`:''}</div>`;
 }
 let filterStage=null;
-const stColor=l=>({Won:'won',Lost:'lost',Booked:'disc',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'}[l]||'demo');
+const stColor=l=>({Won:'won',Lost:'lost',Booked:'booked',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'}[l]||'demo');
+function dealStageColor(d){if(!d)return 'demo';if(d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0)return 'booked';return stColor(d.stage);}
 /* Funnel model: prepend a synthetic "Discovery Booked" (pre-qualified) tile — open deals
    sitting in the Discovery stage that haven't had a Discovery call yet (no Gong call matched).
    That's the pre-qualified intake where the pre-Discovery prep sheet drops. Those deals are
@@ -432,11 +425,11 @@ function fRollup(f){
   return `<div class="frollup">${parts.join('')}</div>`;
 }
 function fRl(label,x,n){const st=x>=n?'ok':(x>0?'warn':'bad');return `<div class="frl ${st}"><span class="fk">${label}</span><span class="fv">${x}/${n}</span></div>`;}
-function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div>${fRollup(f)}</div>`).join('');}
+function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
-  const up=D.upcoming.length?D.upcoming.map(u=>`<div class="up" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${u.deal_id?'Open deal':'New'}</div></div>`).join(''):'';
+  const up=D.upcoming.length?D.upcoming.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const col=dealStageColor(dd);return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${dd?esc(dd.stage):'New'}</div></div>`;}).join(''):'';
   let body='';
   if(filterStage){
     const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[]};const ds=f.deals;
@@ -448,7 +441,7 @@ function renderMain(){
     body=`<div class="empty" style="margin-top:18px">Click a stage above to see its deals.</div>`;
   }
   v.innerHTML=`<div class="h1">Pipeline</div><div class="sub">${ods.length} open deals · ${money(ods.reduce((s,d)=>s+(d.arr||d.amount||0),0))} open pipeline</div>
-    ${up?`<div class="grp"><div class="grp-h"><span class="nm">Upcoming</span></div><div class="up-row">${up}</div></div>`:''}
+    ${up?`<div class="grp"><div class="grp-h"><span class="nm">Upcoming Meetings</span></div><div class="up-row">${up}</div></div>`:''}
     <div class="grp"><div class="grp-h"><span class="nm">Funnel</span><span class="ct">${filterStage?'<a class="lk" onclick="toggleFunnel(null)">Clear filter</a>':'Click a stage to filter'}</span></div><div class="funnel">${funnelTiles()}</div></div>
     ${body}`;
 }
