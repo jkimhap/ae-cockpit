@@ -1209,7 +1209,7 @@ function bookedDeal(id){
   if(!u)return undefined;
   return {id:id,synthetic_booked:true,company:u.company||u.title||'Discovery call',
     stage:'Booked',stage_full:'Discovery Booked',stage_id:'__booked',is_open:true,rubric_stage:'disc',
-    arr:0,amount:0,vertical_quinn:'',vertical_inferred:u.vertical||'',vertical_inferred_meta:u.vertical_meta||{},
+    arr:0,amount:0,vertical_quinn:u.vertical_quinn||'',vertical_inferred:u.vertical||'',vertical_inferred_meta:u.vertical_meta||{},
     employees:u.employees||'',source:'Meetings link',
     primary_contact:{name:u.contact||'',title:u.contact_title||''},
     stakeholders:u.contact?[{name:u.contact,title:u.contact_title||''}]:[],
@@ -1419,21 +1419,21 @@ function bookedTable(ms){
     const sw=d.lms?esc(String(d.lms)):'—';
     const emp=d.employees?esc(String(d.employees)):'—';
     return `<tr onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td>${contact}</td></tr>`;
-  }).join('')||`<tr><td colspan="8"><div class="empty" style="border:none">No upcoming discovery calls booked.</div></td></tr>`;
+  }).join('')||`<tr><td colspan="8"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
-  const ups=(D.upcoming||[]).filter(u=>u.deal_id||u.is_first);   // deal-linked meetings + genuine first calls; drop dealless follow-ups
+  const ups=(D.upcoming||[]).filter(u=>(u.deal_id||u.is_first)&&(!u.start||new Date(u.start).getTime()>=Date.now()));   // agenda = genuinely upcoming; just-held first calls live in the Discovery Booked tile, not here
   const up=ups.length?ups.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const who=dd?(dd.rubric_stage==='disc'?'Discovery Booked':esc(dd.stage)):'Discovery Booked';const col=(who==='Discovery Booked')?'booked':dealStageColor(dd);const href=u.deal_id?`location.hash='#/deal/${u.deal_id}'`:`location.hash='#/deal/booked-${u.meeting_id}'`;return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${href}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${who}</div></div>`;}).join(''):'';
   let body='';
   if(filterStage){
     const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[],meetings:[]};
     if(f.synthetic){
       const ms=f.meetings||[];
-      const note='<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">First calls booked but not yet held — no HubSpot deal until the discovery call completes. Click a row for the pre-Discovery prep sheet & step checklist.</div>';
+      const note='<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">First discovery calls with no HubSpot deal yet — they stay here (even after the call) until a deal is created and gates clear, or it\'s closed-lost. Click a row for the prep sheet & step checklist.</div>';
       body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}${bookedTable(ms)}</div>`;
     }else{
       const ds=f.deals;

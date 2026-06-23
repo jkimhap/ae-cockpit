@@ -128,13 +128,16 @@ def meetings_for(ids):
 def notes_for(ids):
     return batch_read("notes", ids, ["hs_timestamp","hs_note_body"])
 
-def upcoming_meetings(owner_id, now_iso):
-    """Scheduled meetings for this owner with start in the future.
+def upcoming_meetings(owner_id, since_iso):
+    """Meetings for this owner with start AFTER `since_iso`. Callers pass a look-back floor
+    (now − 60d), not just `now`, so a *just-held* first Discovery call still comes back —
+    assemble.py keeps past first-calls-without-a-deal (Discovery Booked stays put until a deal
+    is created or it's closed-lost) and drops past deal-linked meetings.
     hs_activity_type + hs_meeting_source let us tell a genuine *first* Discovery call
     (activity_type "First Meeting", booked via the public Meetings link) from follow-up
     demos/proposal calls — so the Discovery Booked tile shows first calls only (Task #19)."""
     filters = [{"propertyName":"hubspot_owner_id","operator":"EQ","value":str(owner_id)},
-               {"propertyName":"hs_meeting_start_time","operator":"GT","value":now_iso}]
+               {"propertyName":"hs_meeting_start_time","operator":"GT","value":since_iso}]
     try:
         return search("meetings",
             ["hs_meeting_title","hs_meeting_start_time","hs_meeting_outcome",

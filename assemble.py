@@ -257,9 +257,15 @@ def assemble(rep, full=True, log=print):
         _alerts(deal)
 
     deals = [d for d,_ in deals]
-    # ---- upcoming ----
+    # ---- upcoming + recently-held first calls ----
     up = []
     now_iso = _now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Discovery Booked = a first discovery call with no deal yet. It must STAY visible after
+    # the call happens — until a deal is created (gates clear) or it's closed-lost — not vanish
+    # the moment the slot passes (Johnny 2026-06-23, ServiceMaster). So pull a 60-day look-back
+    # window, not future-only; below we keep past *first-calls-without-a-deal* and drop past
+    # deal-linked meetings (so hasFutureMeeting() / the agenda stay future-correct).
+    since_iso = (_now() - datetime.timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
     # meeting_id -> deal_id via the deal<->meeting association (exact match), preferring an
     # open deal. Falls back to company-name-in-title so a meeting titled "Quinn <> Kinetico"
     # still binds to the Kinetico deal and inherits its current-stage colour.
@@ -271,7 +277,7 @@ def assemble(rep, full=True, log=print):
             if mid not in mtg_to_deal or did in open_ids:
                 mtg_to_deal[mid] = did
     open_by_co = {x["company"].lower(): x["id"] for x in deals if x["is_open"]}
-    raw_mtgs = hs.upcoming_meetings(owner["id"], now_iso)
+    raw_mtgs = hs.upcoming_meetings(owner["id"], since_iso)
     # A genuine *first* Discovery call = hs_activity_type "First Meeting" (booked via the public
     # Meetings link) with no deal yet — that's the Discovery Booked tile. Enrich those with the
     # associated contact (booking-form answers: # field workers, LMS) + company (employees,
@@ -292,36 +298,50 @@ def assemble(rep, full=True, log=print):
             tl = title.lower()
             did = open_by_co.get(tl) or next((i for co, i in open_by_co.items() if co and co in tl), None)
         is_first = (mp.get("hs_activity_type") == "First Meeting")
-        e = {"title":title,"start":(mp.get("hs_meeting_start_time") or ""),
+        start = mp.get("hs_meeting_start_time") or ""
+        is_future = start > now_iso          # ISO-Zulu strings compare lexically
+        # Keep genuine first-calls with no deal (Discovery Booked, even if just held) and any
+        # future meeting; drop *past* deal-linked meetings — they belong to the deal's history,
+        # and keeping them would wrongly satisfy hasFutureMeeting() / pollute the agenda.
+        if not ((is_first and not did) or is_future):
+            continue
+        e = {"title":title,"start":start,
              "meeting_id":mid,"is_first":bool(is_first),
              "contact":"","contact_title":"","company":(by_id[did]["company"] if did in by_id else _clean_mtg_title(title)),
              "employees":"","num_of_learners":"","lms":"",
-             "vertical":"","vertical_meta":{},"tier":"",
+             "vertical_quinn":"","vertical":"","vertical_meta":{},"tier":"",
              "deal_id":did}
         if is_first and not did:
             cids = m2contact.get(mid, []); coids = m2company.get(mid, [])
             cp = f_contacts.get(cids[0], {}) if cids else {}
             co = f_companies.get(coids[0], {}) if coids else {}
-            e["contact"] = (cp.get("firstname","")+" "+cp.get("lastname","")).strip()
+            e["contact"] = ((cp.get("firstname") or "")+" "+(cp.get("lastname") or "")).strip()
             e["contact_title"] = cp.get("jobtitle","") or ""
             e["num_of_learners"] = cp.get("num_of_learners","") or ""
             e["lms"] = cp.get("which_lms_") or cp.get("lms") or ""
             if co.get("name"): e["company"] = co.get("name")
             e["employees"] = co.get("numberofemployees") or ""
-            dom = (co.get("domain") or "").lower()
-            # Booked first-calls are a tiny set (a handful per rep) — categorize directly
-            # (cache-first, fetches the few misses) so the prep row always shows a vertical,
-            # even on the fast refresh path. Still never writes to HubSpot.
-            vinf = {}
-            if dom:
-                try: vinf = catz.categorize((coids[0] if coids else mid), e["company"], dom, CACHE_DIR)
-                except Exception: vinf = {}
-            e["vertical"] = (vinf or {}).get("vertical") or ""
-            e["vertical_meta"] = vinf or {}
-            e["tier"] = (vinf or {}).get("tier") or ""
+            # Vertical/tier source mirrors the deal path: the CONTACT "Industry (Quinn)"
+            # property (industry_category) IS the real ICP vertical — use it first. Only when
+            # it's blank do we fall back to the website-scrape categorizer. (Johnny 2026-06-23:
+            # Hometown/NearU had "HVAC Service Provider" on the contact but the row showed blank
+            # because we were reading the scraper only — never miss a vertical that's already
+            # sitting on the contact.)
+            iv = (cp.get("industry_category") or "").strip()
+            if iv and iv.lower() not in ("unknown", "other"):
+                e["vertical_quinn"] = iv
+            else:
+                dom = (co.get("domain") or "").lower()
+                vinf = {}
+                if dom:
+                    try: vinf = catz.categorize((coids[0] if coids else mid), e["company"], dom, CACHE_DIR)
+                    except Exception: vinf = {}
+                e["vertical"] = (vinf or {}).get("vertical") or ""
+                e["vertical_meta"] = vinf or {}
+                e["tier"] = (vinf or {}).get("tier") or ""
         up.append(e)
     up.sort(key=lambda x: x["start"])
-    up = up[:30]
+    up = up[:200]   # one rep's meetings; raised from 30 so the 60-day booked look-back isn't truncated
 
     funnel = []
     for sid in sorted(stage_ids, key=lambda s: order[s]):
