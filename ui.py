@@ -32,8 +32,7 @@ def _topbar(meta=""):
     Built with concatenation (not %-formatting) — _head() carries raw CSS with
     literal % signs that would break any %/format substitution."""
     return ('<header class="topbar">'
-            '<div class="brand"><span class="dot"></span><b>Quinn</b>'
-            '<span>SalesOS</span></div><span class="sp"></span>'
+            '<div class="brand"><b>Quinn SalesOS</b></div><span class="sp"></span>'
             '<span class="refreshed">' + meta + '</span></header>')
 
 def placeholder_html(title, message, active="ian"):
@@ -807,7 +806,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#dcdad4;border-radius:8px;border:3px solid var(--bg)}
 .topbar{position:sticky;top:0;z-index:30;background:rgba(250,249,247,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 30px}
 .brand{display:flex;align-items:center;gap:9px}.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
-.brand b{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:16px;letter-spacing:-0.01em}.brand span{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.brand b{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px;letter-spacing:-0.02em}.brand span{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
 .brand .who{margin-left:10px;padding-left:12px;border-left:1px solid var(--line2);font-size:13px;font-weight:600}
 .sp{margin-left:auto}
 .engine{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 9px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line2);color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
@@ -974,7 +973,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .task .why{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:6px}
 .task .tmeta{font-size:10.5px;color:var(--faint);margin-top:6px;display:flex;gap:6px;align-items:center}
 .workspace{min-width:0;overflow-x:hidden}
-.workspace .main{padding:24px 30px 90px;max-width:1180px;margin:0 auto}
+.workspace .main{padding:24px 36px 90px;max-width:none;margin:0}
 .ws-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:70vh;color:var(--faint);gap:10px;text-align:center;padding:30px}
 .ws-empty .big{font-size:15px;font-weight:600;color:var(--muted)}
 .ibtoggle{display:none}
@@ -1074,7 +1073,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .tab{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;padding:10px 18px;border:1px solid var(--ink);border-bottom:none;background:var(--panel2);text-decoration:none;color:var(--ink);margin-right:-1px;cursor:pointer}
 .tab.active{background:var(--bg);position:relative;top:1px}
 /* ===== Dashboard / placeholder pages ===== */
-.dashwrap{padding:26px 30px 90px;max-width:1180px;margin:0 auto}
+.dashwrap{padding:26px 36px 90px;max-width:none;margin:0}
 .masthead{border-bottom:1px solid var(--ink);padding-bottom:16px;margin-bottom:22px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .masthead .ttl{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;letter-spacing:-0.02em;line-height:1.1}
 .masthead .meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
@@ -1116,7 +1115,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 </style></head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="dot"></span><b>Quinn</b><span>SalesOS Cockpit</span><span class="who" id="repName">…</span></div>
+  <div class="brand"><b>Quinn SalesOS</b><span class="who" id="repName">…</span></div>
   <span class="sp"></span>
   <span class="engine none" id="engine">—</span><span class="refreshed" id="refreshed"></span>
   <button class="rfx" id="rbtn" onclick="refresh(false)">↻ Refresh</button>
