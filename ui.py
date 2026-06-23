@@ -875,6 +875,35 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .stbl .gy{color:var(--green);font-weight:700}.stbl .gn{color:var(--line);font-weight:600}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
+/* ===== In-deal view: SOP-driven stage checklist (rebuilt 2026-06-23) ===== */
+.dv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:16px 0 4px}
+.dv-head .co{font-size:23px;font-weight:700;letter-spacing:-.01em}
+.dv-head .meta{margin-top:8px;font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dv-head .meta .sep{color:var(--line)}
+.dv-head .meta .lk{color:var(--accent-ink);font-weight:600}
+.path-h{display:flex;justify-content:space-between;align-items:baseline;margin:24px 0 12px;border-top:1px solid var(--line);padding-top:20px}
+.path-h .t{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.path-h .pr{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.steps{display:flex;flex-direction:column;gap:3px}
+.step{display:flex;gap:13px;align-items:flex-start;padding:13px 14px;border-radius:9px;cursor:pointer;transition:background .12s}
+.step:hover{background:var(--panel2)}
+.step .num{flex:none;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);width:16px;text-align:right;margin-top:3px}
+.step .ck{flex:none;width:21px;height:21px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;color:transparent;transition:all .12s}
+.step.done .ck{background:#15a34a;border-color:#15a34a;color:#fff}
+.step .bd{flex:1;min-width:0}
+.step .lb{font-size:14px;font-weight:600;color:var(--ink)}
+.step.done .lb{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.step .sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.step .au{font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--green);background:var(--green-bg);padding:1px 6px;border-radius:4px;margin-left:8px;vertical-align:middle;text-transform:uppercase}
+.alldone{margin-top:12px;padding:12px 14px;font-size:13px;color:var(--won);font-weight:600;background:var(--won-bg);border-radius:8px}
+.prepcard{margin-top:22px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);overflow:hidden}
+.prepcard .ph{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:13px 16px;border-bottom:1px solid var(--line)}
+.prepcard .pb{padding:15px 16px}
+.prepcard .blk{margin-bottom:15px}
+.prepcard .blk:last-child{margin-bottom:0}
+.prepcard .bh{font-size:11px;font-weight:700;color:var(--ink);margin-bottom:7px;letter-spacing:.02em;text-transform:uppercase}
+.prepcard ul{margin:0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.65}
+.prepcard .who{font-size:13px;color:var(--muted)}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap;background:#fff;border:1px solid var(--line2);color:var(--muted)}
 .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .st-Discovery{color:var(--disc);background:var(--disc-bg);border-color:var(--disc-bg)}.st-Demo{color:var(--demo);background:var(--demo-bg);border-color:var(--demo-bg)}.st-Quote{color:var(--quote);background:var(--quote-bg);border-color:var(--quote-bg)}.st-Verbal{color:var(--verbal);background:var(--verbal-bg);border-color:var(--verbal-bg)}.st-Won{color:var(--won);background:var(--won-bg);border-color:var(--won-bg)}.st-Lost{color:var(--lost);background:var(--lost-bg);border-color:var(--lost-bg)}
@@ -1331,7 +1360,15 @@ function titleCase(s){return String(s||'').toLowerCase().replace(/_/g,' ').repla
 function dealVertical(d){return QUINN_VERT[d.vertical_quinn]||'—';}
 function dealTier(d){const v=QUINN_VERT[d.vertical_quinn];return v?ICP_TIERS[v]:null;}
 function tierTag(d){const t=dealTier(d);if(!t)return '<span class="tier tx" title="Vertical not set on the HubSpot contact — pending website-scrape categorization (SOP §B)">—</span>';return `<span class="tier t${t}" title="${esc(QUINN_VERT[d.vertical_quinn]||'')}">${TIER_TAG[t]}</span>`;}
-function daysSinceDisc(d){const cs=(d.timeline||[]).filter(e=>e.kind==='call').map(e=>e.ts).filter(Boolean).sort();if(!cs.length)return null;const t0=new Date(cs[0]).getTime();if(isNaN(t0))return null;return Math.max(0,Math.round((Date.now()-t0)/86400000));}
+function discoveryDate(d){
+  // The discovery date is never empty: prefer the actual discovery call, then the
+  // earliest real meeting on the deal, then the stage-entry timestamp. (Fixes the
+  // blank "Since disc" for deals with no Gong call note yet — e.g. Jacuzzi, Bird.)
+  const tl=d.timeline||[];const ok=t=>t&&t!=='0'&&!isNaN(new Date(t).getTime());
+  const pick=k=>tl.filter(e=>e.kind===k&&ok(e.ts)).map(e=>e.ts).sort()[0];
+  return pick('call')||pick('meeting')||pick('stage')||null;
+}
+function daysSinceDisc(d){const dt=discoveryDate(d);if(!dt)return null;const t0=new Date(dt).getTime();if(isNaN(t0))return null;return Math.max(0,Math.round((Date.now()-t0)/86400000));}
 function gateMet(d,iid){if(isCap(d.id,iid))return true;const af=d.ai_fields||{};return !!(af[iid]&&af[iid].value);}
 function stageGates(stage_id){const k=STAGE_RUBRIC[stage_id];if(!k)return [];const s=D.rubric.find(x=>x.key===k);return s?(s.items||[]).filter(it=>it.gate):[];}
 function stageTable(f){
@@ -1375,26 +1412,101 @@ function renderMain(){
 
 /* ---------- deal view ---------- */
 let openStages={};
+/* ===== In-deal view: SOP-driven stage checklist (rebuilt 2026-06-23 per Johnny) =====
+   The page was wiped to a blank slate. It now shows ONE thing: the steps that must
+   happen in this deal's current stage before the AE can advance it — a running log of
+   done vs. to-do, sourced from the SOP stage files (sop/stages/01–07).
+   Steps tagged `auto` are derived from CRM/Gong signal; the rest are manual checkboxes
+   the AE toggles, persisted per-deal in localStorage (dst/save). */
+const STAGE_STEPS={
+  booked:{next:'Discovery Complete',steps:[
+    {k:'prep',lb:'Discovery prep sheet ready',sub:'Key facts, pain + ROI questions, who is in the room (below)',auto:d=>true},
+    {k:'disc_done',lb:'Discovery call completed',sub:'Confirmed by a Gong transcript landing on the deal',auto:d=>hasCall(d)},
+    {k:'bant',lb:'BANT scored + qualification recommendation',sub:'BANT ≥ 50 with floors B≥10 · A≥10 · N≥20 · T≥10',auto:d=>bantScore(d.id).filled>0},
+    {k:'demo_booked',lb:'Demo (next) call booked',sub:'Another call on the calendar with the company',auto:d=>hasFutureMeeting(d)},
+    {k:'fit',lb:'Quinn fit re-confirmed',sub:'Vertical/tier holds; not <25 field workers with an entrenched LMS'}
+  ]},
+  disc_complete:{next:'Demo Complete & ROI Validated',steps:[
+    {k:'recap',lb:'Post-Discovery recap email sent',sub:'Thank-you + pains in their words + next step + source-material ask',auto:d=>hasOutEmail(d)},
+    {k:'source',lb:'Source material received from prospect',sub:'The inputs Ahri needs to build the custom course'},
+    {k:'jira',lb:'Jira form submitted to Ahri',sub:'AE submits the LCC form → Ahri builds the custom course'},
+    {k:'ahri',lb:'Ahri returns the custom course',sub:'Course in hand ≥ 24h before the Demo'},
+    {k:'predemo',lb:'Pre-Demo prep sheet ready',sub:'Demo flow, new stakeholders, high-context ROI questions'}
+  ]},
+  demo:{next:'Quote Sent',steps:[
+    {k:'demo_recap',lb:'Demo / ROI recap email sent'},
+    {k:'roi',lb:'Champion-agreed ROI number on record',sub:'ROI validated with the buyer — the value gate'},
+    {k:'deck',lb:'Proposal deck approved',sub:'Arlen-approved with pricing baked in (skipped on Arlen-owned deals)'},
+    {k:'prop_booked',lb:'Proposal call booked',auto:d=>hasFutureMeeting(d)},
+    {k:'preprop',lb:'Pre-Proposal-call prep sheet ready'}
+  ]},
+  quote:{next:'Verbal Commit',steps:[
+    {k:'prop_summary',lb:'Proposal-call summary logged'},
+    {k:'quote_built',lb:'Quote built in HubSpot',sub:'AE-approved'},
+    {k:'nonstd',lb:'Non-standard items reviewed by Arlen'},
+    {k:'quote_sent',lb:'Quote sent to the buyer',sub:'The AE sends — never the operator'},
+    {k:'redlines',lb:'Redlines / contract negotiation handled'}
+  ]},
+  verbal:{next:'Closed Won',steps:[
+    {k:'agreement',lb:'Agreement sent (same day)'},
+    {k:'concessions',lb:'Predictable concessions pre-cleared',sub:'Arlen-approved'},
+    {k:'csm',lb:'CSM intro + onboarding kickoff started in parallel'},
+    {k:'legal',lb:'Legal-review SLA tracked + weekly chase'},
+    {k:'terms',lb:'Current-terms artifact kept up to date'}
+  ]},
+  won:{next:null,steps:[
+    {k:'handoff',lb:'CSM handoff doc sent + accepted'},
+    {k:'welcome',lb:'Welcome email sent'},
+    {k:'kickoff',lb:'Onboarding kickoff scheduled'},
+    {k:'exec',lb:'Executed agreement returned + filed'},
+    {k:'upsell',lb:'Upsell / expansion monitoring on'}
+  ]},
+  lost:{next:null,steps:[
+    {k:'reason',lb:'Loss reason code + narrative logged',sub:'AE-accepted',auto:d=>!!d.loss},
+    {k:'revival',lb:'Revival watch scheduled (~2 months out)',sub:'Unless killed-for-fit'}
+  ]}
+};
+function stepStage(d){
+  // Map a REAL deal to its SOP stage purely by its HubSpot stage_id — the AE's stage
+  // is the source of truth. (The 'booked' checklist is for the synthetic Discovery
+  // Booked meetings that have no deal yet — wired with the first-calls table, Task #19.)
+  return ({'1090549665':'disc_complete','1090549667':'demo','1104822108':'quote','1329839734':'verbal','1090549670':'won','1090549671':'lost'})[String(d.stage_id)]||'disc_complete';
+}
+function hasCall(d){return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
+function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id)||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
+function hasOutEmail(d){return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||''));}
+function stepDone(d,st){const ov=(dst(d.id).steps||{})[st.k];if(ov===true||ov===false)return ov;return st.auto?!!st.auto(d):false;}
+function toggleStep(id,k,eff){const s=dst(id);s.steps=s.steps||{};s.steps[k]=!eff;save(id,s);renderDeal(id);}
+function prepBlock(d){
+  const cs=curStageObj(d);
+  const qs=(cs.items||[]).filter(it=>it.prompt).slice(0,5).map(it=>`<li>${esc(it.prompt)}</li>`).join('');
+  const t=dealTier(d);const tlab=t?TIER_TAG[t]:'Tier —';
+  const stk=(d.stakeholders||[]).map(s=>`${esc(s.name||'')}${s.title?' — '+esc(s.title):''}`).filter(x=>x.trim()).join(' · ')||'Single-threaded — no second contact yet';
+  const facts=[`${esc(dealVertical(d))} · ${esc(tlab)}`,`${d.employees?d.employees+' employees':'Headcount unknown'}`,`Deal size ${money(d.arr||d.amount)}`,`Source: ${esc(d.source||'—')}`];
+  return `<div class="prepcard"><div class="ph">Discovery prep</div><div class="pb">
+    <div class="blk"><div class="bh">Key facts</div><ul>${facts.map(f=>`<li>${f}</li>`).join('')}</ul></div>
+    <div class="blk"><div class="bh">Who is in the room</div><div class="who">${stk}</div></div>
+    ${qs?`<div class="blk"><div class="bh">Questions to ask</div><ul>${qs}</ul></div>`:''}
+    <div class="blk"><div class="bh">The gate to clear</div><ul><li>Leave with winnability proven — BANT ≥ 50: real operational problem, why-now, a champion, a path to the economic buyer, and the next call booked.</li></ul></div>
+  </div></div>`;
+}
 function renderDeal(id){
   const d=dealById(id);const v=$('#view');if(!d){v.innerHTML='<div class="empty">Deal not found.</div>';return;}
-  const all=dealTasks(id);
-  const open=all.filter(t=>!tStatus(id,t.id));
-  const resolved=all.filter(t=>tStatus(id,t.id));
+  const sk=stepStage(d);const cfg=STAGE_STEPS[sk]||STAGE_STEPS.disc_complete;
+  const c=d.primary_contact||{};
+  const doneN=cfg.steps.filter(st=>stepDone(d,st)).length;const tot=cfg.steps.length;
+  const rows=cfg.steps.map((st,i)=>{const dn=stepDone(d,st);
+    return `<div class="step ${dn?'done':''}" onclick="toggleStep('${d.id}','${st.k}',${dn})">
+      <span class="num">${i+1}</span><span class="ck">✓</span>
+      <span class="bd"><span class="lb">${esc(st.lb)}${st.auto?'<span class="au">auto</span>':''}</span>${st.sub?`<span class="sub">${esc(st.sub)}</span>`:''}</span></div>`;}).join('');
+  const allDone=doneN===tot;
   v.innerHTML=`<a class="back" onclick="location.hash='#/'">← All deals</a>
-   <div class="dhead"><div><div class="co">${esc(d.company)}</div>
-     <div class="meta">${stageChip(d.stage)} <span class="sep">·</span> <b class="tnum">${money(d.arr||d.amount)}</b>
-       <span class="sep">·</span> ${esc(d.dealtype==='newbusiness'?'New business':d.dealtype||'—')}${d.industry?`<span class="sep">·</span> ${esc(d.industry)}`:''}${d.employees?`<span class="sep">·</span> ${d.employees} employees`:''}
-       <span class="sep">·</span> via ${esc(d.source)}${/orum/i.test(d.source)?' ☎':''}<span class="sep">·</span> <a class="lk" href="${d.hubspot_url}" target="_blank">HubSpot ↗</a></div></div>
-     ${dcsBig(d)}</div>
-   ${d.loss?`<div style="margin-top:14px">${lossPanel(d)}</div>`:''}
-   ${statusBar(d,open)}
-   ${keyFactsCard(d)}
-   <div class="sec-h"><span class="nm">What needs you</span><span class="ct">${open.length} open${resolved.length?` · ${resolved.length} resolved`:''}</span></div>
-   ${open.length?`<div class="aq">${open.map(t=>actionCard(d,t)).join('')}</div>`:`<div class="allclear"><div class="big">✓ All clear</div>Nothing needs you on this deal right now. The agent is watching it and will surface the next step.</div>`}
-   ${resolved.length?`<div class="resolved">${resolved.map(t=>resolvedRow(d,t)).join('')}</div>`:''}
-   ${factsSection(d)}
-   ${askDock(d)}`;
-  applyFocus(d);
+    <div class="dv-head"><div><div class="co">${esc(d.company)}</div>
+      <div class="meta">${stageChip(d.stage)} ${tierTag(d)} <span class="sep">·</span> <b class="tnum">${money(d.arr||d.amount)}</b> <span class="sep">·</span> ${esc(dealVertical(d))}${c.name?` <span class="sep">·</span> ${esc(c.name)}${c.title?' — '+esc(c.title):''}`:''}${d.employees?` <span class="sep">·</span> ${d.employees} employees`:''} <span class="sep">·</span> <a class="lk" href="${d.hubspot_url}" target="_blank">HubSpot ↗</a></div></div></div>
+    <div class="path-h"><span class="t">${cfg.next?'Path to '+esc(cfg.next):'Close-out checklist'}</span><span class="pr">${doneN} of ${tot} done</span></div>
+    <div class="steps">${rows}</div>
+    ${allDone&&cfg.next?`<div class="alldone">✓ All steps clear — ready to advance to ${esc(cfg.next)}.</div>`:''}
+    ${sk==='booked'?prepBlock(d):''}`;
 }
 
 /* ===== Task-centric workspace engine (Phase 1) =====
