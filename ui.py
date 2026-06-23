@@ -120,14 +120,19 @@ function barChart(data,opts){
   const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const gap=Math.min(18,iw/n*0.3), bw=(iw-gap*(n-1))/n;
   const fmt=opts.fmt||(v=>v);
+  const accent=opts.color||'var(--core)';
   let bars='';
+  // QuinnOS style: spotlight the current (last) period in the accent colour; de-emphasise
+  // history in muted ink. Single accent per chart — never a rainbow. Flat bars (no radius).
   data.forEach((d,i)=>{
     const bh=Math.max(1,Math.round(d.value/max*ih));
     const x=pad.l+i*(bw+gap), y=pad.t+ih-bh;
-    const col=d.color||opts.color||'var(--core)';
-    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh}" rx="2" fill="${col}"></rect>`;
-    if(d.value>0)bars+=`<text class="vlab" x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${escD(fmt(d.value))}</text>`;
-    bars+=`<text class="axlab" x="${(x+bw/2).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;
+    const cur=i===n-1;
+    const fill=cur?(d.color||accent):'var(--ink)';
+    const op=cur?1:0.42;
+    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh}" fill="${fill}" opacity="${op}"></rect>`;
+    if(cur&&d.value>0)bars+=`<text class="vlab" x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">${escD(fmt(d.value))}</text>`;
+    if(cur||i%2===0)bars+=`<text class="axlab" x="${(x+bw/2).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;
   });
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
     <line x1="${pad.l}" y1="${pad.t+ih+0.5}" x2="${w-pad.r}" y2="${pad.t+ih+0.5}" stroke="var(--line)" stroke-width="1"></line>${bars}</svg>`;
@@ -142,10 +147,10 @@ function lineChart(data,opts){
   const X=i=>pad.l+(n<=1?iw/2:i/(n-1)*iw), Y=v=>pad.t+ih-Math.max(0,v/max*ih);
   let dpath='';data.forEach((d,i)=>{dpath+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(d.value).toFixed(1)+' ';});
   const apath='M'+X(0).toFixed(1)+' '+(pad.t+ih)+' '+dpath.replace(/^M/,'L')+'L'+X(n-1).toFixed(1)+' '+(pad.t+ih)+' Z';
-  let dots='';data.forEach((d,i)=>{dots+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="2.4" fill="var(--core)"></circle>`+
-    `<text class="axlab" x="${X(i).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;});
+  let dots='';data.forEach((d,i)=>{const cur=i===n-1;dots+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="${cur?3.4:2.2}" fill="var(--core)" opacity="${cur?1:0.6}"></circle>`+
+    ((cur||i%2===0)?`<text class="axlab" x="${X(i).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`:'');});
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
-    <path d="${apath}" fill="var(--core-bg)" opacity="0.55"></path>
+    <path d="${apath}" fill="var(--core)" opacity="0.08"></path>
     <path d="${dpath}" fill="none" stroke="var(--core)" stroke-width="2"></path>
     <text x="${(w-pad.r).toFixed(1)}" y="${(Y(data[n-1].value)-7).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--ink)">${escD(fmt(data[n-1].value))}</text>${dots}</svg>`;
 }
@@ -206,6 +211,68 @@ function winRows(){
     <div class="chartbox"><h3>Win rate by creation cohort</h3>${coHtml}<div class="delta flat" style="margin-top:10px">🟡 maturing — more deals still open than decided</div></div>`;
 }
 
+// ---- open pipeline reconstructed point-in-time, per week (from dated stage events) ----
+// Answers "what was open pipeline worth at the end of each of the last N weeks": a deal
+// counts in week W if it had been created by W's end and had NOT yet closed by W's end.
+function weekMondays(weeks){
+  const today=mondayOf(new Date());if(!today)return [];
+  const out=[];for(let i=weeks-1;i>=0;i--){const m=new Date(today);m.setDate(today.getDate()-i*7);out.push(m);}
+  return out;
+}
+function pipelineSeries(weeks){
+  const ds=mergedDeals(), ms=weekMondays(weeks);
+  return ms.map(m=>{const end=new Date(m);end.setDate(m.getDate()+6);end.setHours(23,59,59,999);const et=end.getTime();
+    let v=0;ds.forEach(d=>{const ct=Date.parse(createdTs(d)||'');if(isNaN(ct)||ct>et)return;
+      let openAt;if(d.is_open)openAt=true;else{const cl=Date.parse(closedTs(d,d.stage==='Won'?'Won':'Lost')||'');openAt=isNaN(cl)?false:(cl>et);}
+      if(openAt)v+=dealVal(d);});
+    return {label:wlabel(m),value:Math.round(v)};});
+}
+
+// ---- Q2 performance goals (the canonical GTM plan committed with Arlen) ----
+const Q2_START=Date.parse('2026-04-01T00:00:00Z'), Q2_END=Date.parse('2026-06-30T23:59:59Z');
+const REPNAME={grant:'Grant',arlen:'Arlen',ian:'Ian',luke:'Luke'};
+const OWNER_NAME_BY_ID={'80532323':'Arlen','77307934':'Derek','80723038':'Grant','80723039':'Ian','86257981':'Luke','80734651':'Bo'};
+const Q2_GOALS=[
+  {title:'Q2 Closed-Won Goal',sub:'Closed-won ARR · Apr 1 – Jun 30 · deal-owner attribution',company:580000,byRep:{Arlen:230000,Grant:100000}},
+  {title:'Q2 Sourcing Goal',sub:'Closed-won ARR · Apr 1 – Jun 30 · primary-contributor (sourcing AE)',company:325000,byRep:{Grant:75000,Luke:100000,Ian:90000}},
+];
+function q2WonByRep(){
+  const out={};Object.keys(RAW).forEach(r=>{if(!RAW[r])return;let v=0;
+    (RAW[r].deals||[]).forEach(d=>{if(d.is_open||d.stage!=='Won')return;
+      const t=Date.parse(closedTs(d,'Won')||'');if(isNaN(t)||t<Q2_START||t>Q2_END)return;v+=dealVal(d);});
+    out[REPNAME[r]||r]=v;});
+  return out;
+}
+function q2SrcByRep(){
+  const out={};mergedDeals().forEach(d=>{if(d.is_open||d.stage!=='Won')return;
+    const t=Date.parse(closedTs(d,'Won')||'');if(isNaN(t)||t<Q2_START||t>Q2_END)return;
+    const nm=OWNER_NAME_BY_ID[String(d.primary_contributor||'')];if(!nm)return;
+    out[nm]=(out[nm]||0)+dealVal(d);});
+  return out;
+}
+function goalRow(name,target,actual,hasActual){
+  const pct=target?Math.min(100,Math.round(actual/target*100)):0;
+  const stat=hasActual?`<b>${moneyK(actual)}</b> / ${moneyK(target)} · ${pct}%`:`<span style="color:var(--muted)">— / ${moneyK(target)}</span>`;
+  return `<div class="wrow"><div class="wl">${escD(name)}</div>
+    <div class="wtrack"><div class="wfill" style="width:${hasActual?pct:0}%"></div></div>
+    <div class="wstat">${stat}</div></div>`;
+}
+function goalCard(g,actuals,hasData,note){
+  const comp=Object.keys(g.byRep).reduce((s,nm)=>s+(actuals[nm]||0),0);
+  const pct=g.company?Math.round(comp/g.company*100):0;
+  const rows=Object.keys(g.byRep).map(nm=>goalRow(nm,g.byRep[nm],actuals[nm]||0,hasData)).join('');
+  return `<div class="chartbox"><h3>${escD(g.title)}</h3>
+    <div class="section-sub" style="margin:-2px 0 10px">${escD(g.sub)}</div>
+    <div class="headline">${hasData?moneyK(comp):'—'} <span style="color:var(--muted);font-size:14px;font-weight:500">/ ${moneyK(g.company)} company · ${hasData?pct+'%':'plan'}</span></div>
+    <div class="wtrack" style="margin:7px 0 13px"><div class="wfill" style="width:${hasData?Math.min(100,pct):0}%"></div></div>
+    ${rows}${note?`<div class="delta flat" style="margin-top:10px">${escD(note)}</div>`:''}</div>`;
+}
+function goalCards(){
+  const src=q2SrcByRep(), srcHas=Object.keys(src).length>0;
+  return goalCard(Q2_GOALS[0],q2WonByRep(),true,'Live · synced reps only — fills in as each AE syncs')
+       + goalCard(Q2_GOALS[1],src,srcHas,srcHas?'Live · primary-contributor attribution':'Canonical Q2 sourcing plan — live attribution lands on the next full sync');
+}
+
 function freshLine(){
   const parts=[];
   ['grant','arlen'].forEach(r=>{if(RAW[r]&&RAW[r].refreshed)parts.push(r.charAt(0).toUpperCase()+r.slice(1)+' · '+String(RAW[r].refreshed).replace(' UTC','').slice(0,16));});
@@ -225,18 +292,19 @@ function render(){
     return `<button class="${on&&exists?'active':''}" ${exists?'':'disabled style="opacity:.4;cursor:default"'} onclick="toggleRep('${r}')">${r}</button>`;
   }).join('');
   const k=kpis(), mf=v=>moneyK(v);
+  const LOST='#a8454c';   // QuinnOS muted burgundy for lost (deal-view stage red stays as-is)
   const lead=[
+    card('First sales calls held / wk',barChart(weekly(evCalls(),12),{color:'var(--core)'})),
+    card('Deals created / wk',barChart(weekly(evCreated(),12),{color:'var(--core)'})),
     card('Meetings booked / wk',barChart(weekly(evMeetings(),12),{color:'var(--core)'})),
-    card('Sales calls held / wk',barChart(weekly(evCalls(),12),{color:'var(--demo)'})),
-    card('Deals created / wk',barChart(weekly(evCreated(),12),{color:'var(--booked)'})),
-    card('Pipeline stage mix · open',barChart(stageMix(false),{})),
+    card('Open pipeline · weekly',lineChart(pipelineSeries(12),{fmt:mf})),
   ].join('');
   const trail=[
-    card('Deals won / wk',barChart(weekly(evWon(false),12),{color:'var(--won)'})),
-    card('Value won / wk',barChart(weekly(evWon(true),12),{color:'var(--won)',fmt:mf})),
-    card('Deals lost / wk',barChart(weekly(evLost(false),12),{color:'var(--lost)'})),
-    card('Value lost / wk',barChart(weekly(evLost(true),12),{color:'var(--lost)',fmt:mf})),
-    card('Avg deal size / wk',barChart(avgDealWeekly(),{color:'var(--quote)',fmt:mf})),
+    card('Closed-won deals / wk',barChart(weekly(evWon(false),12),{color:'var(--core)'})),
+    card('Closed-won value / wk',barChart(weekly(evWon(true),12),{color:'var(--core)',fmt:mf})),
+    card('Closed-lost deals / wk',barChart(weekly(evLost(false),12),{color:LOST})),
+    card('Closed-lost value / wk',barChart(weekly(evLost(true),12),{color:LOST,fmt:mf})),
+    card('Avg deal size / wk',barChart(avgDealWeekly(),{color:'var(--core)',fmt:mf})),
     card('Cumulative value won',lineChart(cumulativeSeries(evWon(true)),{fmt:mf})),
   ].join('');
   root.innerHTML=`
@@ -247,6 +315,8 @@ function render(){
     <div class="kpirow">${k.map(x=>`<div class="kpi"><div class="v tnum">${escD(x.v)}</div><div class="l">${escD(x.l)}</div>${x.sub?`<div class="sub2 tnum">${escD(x.sub)}</div>`:''}</div>`).join('')}</div>
     <div class="section-title">Leading indicators</div><div class="section-sub">Activity that builds pipeline · last 12 weeks</div>
     <div class="chartgrid">${lead}</div>
+    <div class="section-title">Performance goals</div><div class="section-sub">Q2 plan vs. actuals · Apr 1 – Jun 30</div>
+    <div class="chartgrid">${goalCards()}</div>
     <div class="section-title">Trailing indicators</div><div class="section-sub">Outcomes · last 12 weeks</div>
     <div class="chartgrid">${trail}</div>
     <div class="section-title">Conversion</div><div class="section-sub">Win rate</div>

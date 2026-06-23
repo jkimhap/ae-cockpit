@@ -230,13 +230,28 @@ def assemble(rep, full=True, log=print):
     # ---- upcoming ----
     up = []
     now_iso = _now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    # meeting_id -> deal_id via the deal<->meeting association (exact match), preferring an
+    # open deal. Falls back to company-name-in-title so a meeting titled "Quinn <> Kinetico"
+    # still binds to the Kinetico deal and inherits its current-stage colour.
+    open_ids = {x["id"] for x in deals if x["is_open"]}
+    by_id = {x["id"]: x for x in deals}
+    mtg_to_deal = {}
+    for did, mids in a_mt.items():
+        for mid in mids:
+            if mid not in mtg_to_deal or did in open_ids:
+                mtg_to_deal[mid] = did
     open_by_co = {x["company"].lower(): x["id"] for x in deals if x["is_open"]}
     for m in hs.upcoming_meetings(owner["id"], now_iso):
         mp = m["properties"]
         title = mp.get("hs_meeting_title","") or "Meeting"
+        did = mtg_to_deal.get(str(m.get("id","")))
+        if not did:
+            tl = title.lower()
+            did = open_by_co.get(tl) or next((i for co, i in open_by_co.items() if co and co in tl), None)
+        co_label = by_id[did]["company"] if did in by_id else title
         up.append({"title":title,"start":(mp.get("hs_meeting_start_time") or ""),
-                   "contact":"","company":title,"tier":"","qual":"",
-                   "deal_id":open_by_co.get(title.lower())})
+                   "contact":"","company":co_label,"tier":"","qual":"",
+                   "deal_id":did})
     up.sort(key=lambda x: x["start"])
     up = up[:18]
 
