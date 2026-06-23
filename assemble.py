@@ -271,19 +271,57 @@ def assemble(rep, full=True, log=print):
             if mid not in mtg_to_deal or did in open_ids:
                 mtg_to_deal[mid] = did
     open_by_co = {x["company"].lower(): x["id"] for x in deals if x["is_open"]}
-    for m in hs.upcoming_meetings(owner["id"], now_iso):
+    raw_mtgs = hs.upcoming_meetings(owner["id"], now_iso)
+    # A genuine *first* Discovery call = hs_activity_type "First Meeting" (booked via the public
+    # Meetings link) with no deal yet — that's the Discovery Booked tile. Enrich those with the
+    # associated contact (booking-form answers: # field workers, LMS) + company (employees,
+    # domain→vertical). Follow-up demos/proposal calls (which have deals) stay plain.
+    first_mids = [str(m.get("id","")) for m in raw_mtgs
+                  if m["properties"].get("hs_activity_type") == "First Meeting"
+                  and not mtg_to_deal.get(str(m.get("id","")))]
+    m2contact = hs.assoc("meetings","contacts",first_mids) if first_mids else {}
+    m2company = hs.assoc("meetings","companies",first_mids) if first_mids else {}
+    f_contacts = hs.contacts_for(sorted({c for v in m2contact.values() for c in v})) if m2contact else {}
+    f_companies = hs.companies_for(sorted({c for v in m2company.values() for c in v})) if m2company else {}
+    for m in raw_mtgs:
         mp = m["properties"]
+        mid = str(m.get("id",""))
         title = mp.get("hs_meeting_title","") or "Meeting"
-        did = mtg_to_deal.get(str(m.get("id","")))
+        did = mtg_to_deal.get(mid)
         if not did:
             tl = title.lower()
             did = open_by_co.get(tl) or next((i for co, i in open_by_co.items() if co and co in tl), None)
-        co_label = by_id[did]["company"] if did in by_id else title
-        up.append({"title":title,"start":(mp.get("hs_meeting_start_time") or ""),
-                   "contact":"","company":co_label,"tier":"","qual":"",
-                   "deal_id":did})
+        is_first = (mp.get("hs_activity_type") == "First Meeting")
+        e = {"title":title,"start":(mp.get("hs_meeting_start_time") or ""),
+             "meeting_id":mid,"is_first":bool(is_first),
+             "contact":"","contact_title":"","company":(by_id[did]["company"] if did in by_id else _clean_mtg_title(title)),
+             "employees":"","num_of_learners":"","lms":"",
+             "vertical":"","vertical_meta":{},"tier":"",
+             "deal_id":did}
+        if is_first and not did:
+            cids = m2contact.get(mid, []); coids = m2company.get(mid, [])
+            cp = f_contacts.get(cids[0], {}) if cids else {}
+            co = f_companies.get(coids[0], {}) if coids else {}
+            e["contact"] = (cp.get("firstname","")+" "+cp.get("lastname","")).strip()
+            e["contact_title"] = cp.get("jobtitle","") or ""
+            e["num_of_learners"] = cp.get("num_of_learners","") or ""
+            e["lms"] = cp.get("which_lms_") or cp.get("lms") or ""
+            if co.get("name"): e["company"] = co.get("name")
+            e["employees"] = co.get("numberofemployees") or ""
+            dom = (co.get("domain") or "").lower()
+            # Booked first-calls are a tiny set (a handful per rep) — categorize directly
+            # (cache-first, fetches the few misses) so the prep row always shows a vertical,
+            # even on the fast refresh path. Still never writes to HubSpot.
+            vinf = {}
+            if dom:
+                try: vinf = catz.categorize((coids[0] if coids else mid), e["company"], dom, CACHE_DIR)
+                except Exception: vinf = {}
+            e["vertical"] = (vinf or {}).get("vertical") or ""
+            e["vertical_meta"] = vinf or {}
+            e["tier"] = (vinf or {}).get("tier") or ""
+        up.append(e)
     up.sort(key=lambda x: x["start"])
-    up = up[:18]
+    up = up[:30]
 
     funnel = []
     for sid in sorted(stage_ids, key=lambda s: order[s]):
@@ -342,6 +380,15 @@ def _num(v):
 
 def _name_from(dealname):
     return (dealname or "Unnamed deal").split(" - ")[0].strip()
+
+def _clean_mtg_title(t):
+    """'Quinn <> Acme Discussion' -> 'Acme'. Used as the company label for a booked first
+    call only when no company is associated to the meeting."""
+    t = (t or "").strip()
+    t = re.sub(r"(?i)^\s*quinn\s*<>\s*", "", t)
+    t = re.sub(r"(?i)^\s*quinn\s*[:\-|]\s*", "", t)
+    t = re.sub(r"(?i)\s+(discussion|discovery(\s*call)?|intro(ductory)?(\s*call)?|meeting|call|demo|chat|sync)\s*$", "", t)
+    return t.strip() or "Meeting"
 
 def load_kb():
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -1198,7 +1198,24 @@ const REP="__REP__"; let D=null;
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money=v=>v==null||v===''||isNaN(v)?'—':'$'+Math.round(+v).toLocaleString();
-const dealById=id=>D.deals.find(d=>d.id===id);
+const dealById=id=>D.deals.find(d=>d.id===id)||bookedDeal(id);
+/* A Discovery Booked row has no HubSpot deal yet, so build a synthetic deal-like object
+   from the booked first-call meeting. It routes to the same in-deal view (the 'booked'
+   checklist + the toggle-able prep sheet) as a real deal. id form: 'booked-<meeting_id>'. */
+function bookedDeal(id){
+  if(typeof id!=='string'||id.indexOf('booked-')!==0)return undefined;
+  const mid=id.slice(7);
+  const u=(D.upcoming||[]).find(x=>String(x.meeting_id)===mid&&!x.deal_id&&x.is_first);
+  if(!u)return undefined;
+  return {id:id,synthetic_booked:true,company:u.company||u.title||'Discovery call',
+    stage:'Booked',stage_full:'Discovery Booked',stage_id:'__booked',is_open:true,rubric_stage:'disc',
+    arr:0,amount:0,vertical_quinn:'',vertical_inferred:u.vertical||'',vertical_inferred_meta:u.vertical_meta||{},
+    employees:u.employees||'',source:'Meetings link',
+    primary_contact:{name:u.contact||'',title:u.contact_title||''},
+    stakeholders:u.contact?[{name:u.contact,title:u.contact_title||''}]:[],
+    hubspot_url:'',timeline:[],ai_fields:{},dcs:null,loss:null,
+    meeting_start:u.start,num_of_learners:u.num_of_learners||'',lms:u.lms||''};
+}
 const fmtDate=s=>{if(!s)return '';const d=new Date(s);return isNaN(d)?String(s).slice(0,10):d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 const fmtDT=s=>{const d=new Date(s);return isNaN(d)?s:d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});};
 const ago=s=>{if(!s)return '';const d=new Date(s.replace(' UTC','Z').replace(' ','T'));if(isNaN(d))return s;const h=(Date.now()-d)/36e5;return h<1?Math.max(1,Math.round(h*60))+'m ago':h<24?Math.round(h)+'h ago':Math.round(h/24)+'d ago';};
@@ -1298,7 +1315,7 @@ function dealStageColor(d){if(!d)return 'demo';if(d.is_open&&d.rubric_stage==='d
    dealstage tile rolls up where the system is on entry-gates + required artifacts. */
 function funnelModel(){
   const sum=ds=>ds.reduce((s,d)=>s+(d.arr||d.amount||0),0);
-  const bookedMeetings=(D.upcoming||[]).filter(u=>!u.deal_id);   // no deal yet = booked, not held
+  const bookedMeetings=(D.upcoming||[]).filter(u=>!u.deal_id&&u.is_first);   // genuine first Discovery calls, no deal yet
   const out=[{stage_id:'__booked',label:'Booked',full:'Discovery Booked',synthetic:true,meetings:bookedMeetings,deals:[],n:bookedMeetings.length,arr:0}];
   D.funnel.forEach(f=>{const ds=D.deals.filter(d=>d.stage_id===f.stage_id);out.push(Object.assign({},f,{deals:ds,n:ds.length,arr:sum(ds)}));});
   return out;
@@ -1388,19 +1405,36 @@ function stageTable(f){
   }).join('')||`<tr><td colspan="${7+gates.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
+/* Discovery Booked enrichment table: first calls booked but not yet held. Same look as
+   stageTable, but the columns are the pre-call qualification the booking form captured
+   (field-worker count, do-they-use-software, employees) + inferred vertical/tier, so the
+   AE can size the prospect at a glance. Each row clicks into the synthetic booked deal,
+   which shows the same step checklist + a toggle-able prep sheet. */
+function bookedTable(ms){
+  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Field workers</th><th>Uses software</th><th class="num">Employees</th><th>Contact</th></tr>`;
+  const rows=ms.map(u=>{const d=bookedDeal('booked-'+u.meeting_id);if(!d)return '';
+    const c=d.primary_contact||{};
+    const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
+    const lw=d.num_of_learners?esc(String(d.num_of_learners)):'—';
+    const sw=d.lms?esc(String(d.lms)):'—';
+    const emp=d.employees?esc(String(d.employees)):'—';
+    return `<tr onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td>${contact}</td></tr>`;
+  }).join('')||`<tr><td colspan="8"><div class="empty" style="border:none">No upcoming discovery calls booked.</div></td></tr>`;
+  return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+}
 function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
 function renderMain(){
   const v=$('#view');const ods=openDeals();const closed=D.deals.filter(d=>!d.is_open);
-  const up=D.upcoming.length?D.upcoming.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const who=dd?(dd.rubric_stage==='disc'?'Discovery Booked':esc(dd.stage)):'Discovery Booked';const col=(who==='Discovery Booked')?'booked':dealStageColor(dd);return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${u.deal_id?`location.hash='#/deal/${u.deal_id}'`:''}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${who}</div></div>`;}).join(''):'';
+  const ups=(D.upcoming||[]).filter(u=>u.deal_id||u.is_first);   // deal-linked meetings + genuine first calls; drop dealless follow-ups
+  const up=ups.length?ups.map(u=>{const dd=u.deal_id?dealById(u.deal_id):null;const who=dd?(dd.rubric_stage==='disc'?'Discovery Booked':esc(dd.stage)):'Discovery Booked';const col=(who==='Discovery Booked')?'booked':dealStageColor(dd);const href=u.deal_id?`location.hash='#/deal/${u.deal_id}'`:`location.hash='#/deal/booked-${u.meeting_id}'`;return `<div class="up" style="border-left:4px solid var(--${col});background:var(--${col}-bg)" onclick="${href}"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">${who}</div></div>`;}).join(''):'';
   let body='';
   if(filterStage){
     const f=funnelModel().find(x=>x.stage_id===filterStage)||{full:'',deals:[],meetings:[]};
     if(f.synthetic){
       const ms=f.meetings||[];
-      const note='<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">First calls booked but not yet held — no HubSpot deal until the discovery call completes. The agent drops the pre-Discovery prep sheet here.</div>';
-      const rows=ms.map(u=>`<div class="up" style="border-left:4px solid var(--booked);background:var(--booked-bg)"><div class="when">${esc(fmtDT(u.start))}</div><div class="ti">${esc(u.company||u.title||'Meeting')}</div><div class="who">Discovery Booked</div></div>`).join('')||'<div class="empty">No upcoming discovery calls booked.</div>';
-      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}<div class="up-row">${rows}</div></div>`;
+      const note='<div class="empty" style="text-align:left;border:none;padding:4px 0 12px;color:var(--faint)">First calls booked but not yet held — no HubSpot deal until the discovery call completes. Click a row for the pre-Discovery prep sheet & step checklist.</div>';
+      body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ms.length} booked</span></div>${note}${bookedTable(ms)}</div>`;
     }else{
       const ds=f.deals;
       body=`<div class="grp"><div class="grp-h"><span class="nm">${esc(f.full)}</span><span class="ct">${ds.length} · ${money(ds.reduce((s,d)=>s+(d.arr||d.amount||0),0))} · ✓ = stage entry gate met</span></div>${stageTable(f)}</div>`;
@@ -1473,9 +1507,10 @@ const STAGE_STEPS={
   ]}
 };
 function stepStage(d){
+  // Synthetic Discovery Booked row (no deal yet) → the pre-discovery 'booked' checklist.
+  if(d.synthetic_booked)return 'booked';
   // Map a REAL deal to its SOP stage purely by its HubSpot stage_id — the AE's stage
-  // is the source of truth. (The 'booked' checklist is for the synthetic Discovery
-  // Booked meetings that have no deal yet — wired with the first-calls table, Task #19.)
+  // is the source of truth.
   return ({'1090549665':'disc_complete','1090549667':'demo','1104822108':'quote','1329839734':'verbal','1090549670':'won','1090549671':'lost'})[String(d.stage_id)]||'disc_complete';
 }
 function hasCall(d){return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
@@ -1488,13 +1523,19 @@ function prepBlock(d){
   const qs=(cs.items||[]).filter(it=>it.prompt).slice(0,5).map(it=>`<li>${esc(it.prompt)}</li>`).join('');
   const t=dealTier(d);const tlab=t?TIER_TAG[t]:'Tier —';
   const stk=(d.stakeholders||[]).map(s=>`${esc(s.name||'')}${s.title?' — '+esc(s.title):''}`).filter(x=>x.trim()).join(' · ')||'Single-threaded — no second contact yet';
-  const facts=[`${esc(dealVertical(d))} · ${esc(tlab)}`,`${d.employees?d.employees+' employees':'Headcount unknown'}`,`Deal size ${money(d.arr||d.amount)}`,`Source: ${esc(d.source||'—')}`];
-  return `<div class="prepcard"><div class="ph">Discovery prep</div><div class="pb">
+  const learners=d.num_of_learners?`${esc(String(d.num_of_learners))} field workers`:(d.employees?'Field-worker count TBD':'Headcount unknown');
+  const lms=d.lms?`Training software today: ${esc(String(d.lms))}`:'Training software today: ask on the call';
+  const facts=[`${esc(dealVertical(d))} · ${esc(tlab)}`,learners,`${d.employees?d.employees+' employees':'Company size unknown'}`,lms,`Source: ${esc(d.source||'—')}`];
+  // Tier-1/2/3 verticals with no same-vertical reference dossier → lead with the problem,
+  // not a customer proof we don't have (Rita's field log, 2026-06-23).
+  const proof=(t&&t<=3)?`No same-vertical reference customer yet — <b>lead with the problem &amp; cost-of-inaction</b>, not a proof point we don't have.`:`Likely outside core ICP — qualify hard for real field-worker training need before investing the cycle.`;
+  return `<details class="prepcard" open><summary class="ph">Discovery prep — key facts &amp; talk track</summary><div class="pb">
     <div class="blk"><div class="bh">Key facts</div><ul>${facts.map(f=>`<li>${f}</li>`).join('')}</ul></div>
     <div class="blk"><div class="bh">Who is in the room</div><div class="who">${stk}</div></div>
     ${qs?`<div class="blk"><div class="bh">Questions to ask</div><ul>${qs}</ul></div>`:''}
+    <div class="blk"><div class="bh">Proof / positioning</div><div class="who">${proof}</div></div>
     <div class="blk"><div class="bh">The gate to clear</div><ul><li>Leave with winnability proven — BANT ≥ 50: real operational problem, why-now, a champion, a path to the economic buyer, and the next call booked.</li></ul></div>
-  </div></div>`;
+  </div></details>`;
 }
 function renderDeal(id){
   const d=dealById(id);const v=$('#view');if(!d){v.innerHTML='<div class="empty">Deal not found.</div>';return;}
@@ -1506,9 +1547,13 @@ function renderDeal(id){
       <span class="num">${i+1}</span><span class="ck">✓</span>
       <span class="bd"><span class="lb">${esc(st.lb)}${st.auto?'<span class="au">auto</span>':''}</span>${st.sub?`<span class="sub">${esc(st.sub)}</span>`:''}</span></div>`;}).join('');
   const allDone=doneN===tot;
-  v.innerHTML=`<a class="back" onclick="location.hash='#/'">← All deals</a>
+  const valBit=d.synthetic_booked
+    ? `<b class="tnum">Discovery call</b> <span class="sep">·</span> ${esc(fmtDT(d.meeting_start))}`
+    : `<b class="tnum">${money(d.arr||d.amount)}</b>`;
+  const linkBit=d.hubspot_url?` <span class="sep">·</span> <a class="lk" href="${d.hubspot_url}" target="_blank">HubSpot ↗</a>`:'';
+  v.innerHTML=`<a class="back" onclick="location.hash='#/'">← ${d.synthetic_booked?'All meetings':'All deals'}</a>
     <div class="dv-head"><div><div class="co">${esc(d.company)}</div>
-      <div class="meta">${stageChip(d.stage)} ${tierTag(d)} <span class="sep">·</span> <b class="tnum">${money(d.arr||d.amount)}</b> <span class="sep">·</span> ${esc(dealVertical(d))}${c.name?` <span class="sep">·</span> ${esc(c.name)}${c.title?' — '+esc(c.title):''}`:''}${d.employees?` <span class="sep">·</span> ${d.employees} employees`:''} <span class="sep">·</span> <a class="lk" href="${d.hubspot_url}" target="_blank">HubSpot ↗</a></div></div></div>
+      <div class="meta">${stageChip(d.stage)} ${tierTag(d)} <span class="sep">·</span> ${valBit} <span class="sep">·</span> ${esc(dealVertical(d))}${c.name?` <span class="sep">·</span> ${esc(c.name)}${c.title?' — '+esc(c.title):''}`:''}${d.employees?` <span class="sep">·</span> ${d.employees} employees`:''}${linkBit}</div></div></div>
     <div class="path-h"><span class="t">${cfg.next?'Path to '+esc(cfg.next):'Close-out checklist'}</span><span class="pr">${doneN} of ${tot} done</span></div>
     <div class="steps">${rows}</div>
     ${allDone&&cfg.next?`<div class="alldone">✓ All steps clear — ready to advance to ${esc(cfg.next)}.</div>`:''}

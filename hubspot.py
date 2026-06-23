@@ -104,8 +104,12 @@ def companies_for(ids):
 def contacts_for(ids):
     # industry_category = the CONTACT "Industry (Quinn)" property — the real ICP vertical.
     # (The HubSpot company `industry` enum is coarse/useless and is not used for vertical/tier.)
+    # num_of_learners / lms / which_lms_ are the booking-form answers the internal rep / prospect
+    # fills when a Discovery call is booked ("How many frontline workers…", "Do you use software…",
+    # "Which LMS?") — they pre-fill the Discovery Booked enrichment row; empty stays empty.
     return batch_read("contacts", ids,
-        ["firstname","lastname","email","jobtitle","phone","industry_category"])
+        ["firstname","lastname","email","jobtitle","phone","industry_category",
+         "num_of_learners","lms","which_lms_"])
 
 def calls_for(ids):
     return batch_read("calls", ids,
@@ -125,12 +129,16 @@ def notes_for(ids):
     return batch_read("notes", ids, ["hs_timestamp","hs_note_body"])
 
 def upcoming_meetings(owner_id, now_iso):
-    """Scheduled meetings for this owner with start in the future."""
+    """Scheduled meetings for this owner with start in the future.
+    hs_activity_type + hs_meeting_source let us tell a genuine *first* Discovery call
+    (activity_type "First Meeting", booked via the public Meetings link) from follow-up
+    demos/proposal calls — so the Discovery Booked tile shows first calls only (Task #19)."""
     filters = [{"propertyName":"hubspot_owner_id","operator":"EQ","value":str(owner_id)},
                {"propertyName":"hs_meeting_start_time","operator":"GT","value":now_iso}]
     try:
         return search("meetings",
-            ["hs_meeting_title","hs_meeting_start_time","hs_meeting_outcome","hs_internal_meeting_notes"],
+            ["hs_meeting_title","hs_meeting_start_time","hs_meeting_outcome",
+             "hs_internal_meeting_notes","hs_activity_type","hs_meeting_source"],
             filters)
     except Exception:
         return []
