@@ -873,6 +873,9 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .stbl td.num{font-family:'JetBrains Mono',monospace;color:var(--faint);text-align:right;white-space:nowrap}
 .stbl td.gc{text-align:center;font-size:14px}
 .stbl .gy{color:var(--green);font-weight:700}.stbl .gn{color:var(--line);font-weight:600}
+/* Past discovery calls (already happened, still in Booked) recede; future calls stay normal.
+   Hover restores full strength so a past row is fully readable on interaction. */
+.stbl.bookedtbl tbody tr.past{opacity:.5}.stbl.bookedtbl tbody tr.past:hover{opacity:1}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
 .tier.inf{opacity:.92;box-shadow:inset 0 -2px 0 rgba(255,255,255,.45)}
@@ -1410,17 +1413,24 @@ function stageTable(f){
    (field-worker count, do-they-use-software, employees) + inferred vertical/tier, so the
    AE can size the prospect at a glance. Each row clicks into the synthetic booked deal,
    which shows the same step checklist + a toggle-able prep sheet. */
+/* The 4 right-hand checkmark columns = the Discovery Booked exit checks (Johnny 2026-06-23),
+   each reading the same booked-stage step state the row's detail checklist uses. */
+const BOOKED_COLS=[['disc_done','Call done?'],['bant','BANT + rec?'],['demo_booked','Next call?'],['fit','Quinn fit?']];
+function bookedStepByK(k){return STAGE_STEPS.booked.steps.find(s=>s.k===k);}
 function bookedTable(ms){
-  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Field workers</th><th>Uses software</th><th class="num">Employees</th><th>Contact</th></tr>`;
+  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num">Field workers</th><th>Uses software</th><th class="num">Employees</th><th>Contact</th>${BOOKED_COLS.map(([k,lb])=>`<th class="gcol" title="${esc((bookedStepByK(k)||{}).lb||lb)} — Discovery Booked exit check">${lb}</th>`).join('')}</tr>`;
+  const now=Date.now();
   const rows=ms.map(u=>{const d=bookedDeal('booked-'+u.meeting_id);if(!d)return '';
     const c=d.primary_contact||{};
     const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
     const lw=d.num_of_learners?esc(String(d.num_of_learners)):'—';
     const sw=d.lms?esc(String(d.lms)):'—';
     const emp=d.employees?esc(String(d.employees)):'—';
-    return `<tr onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td>${contact}</td></tr>`;
-  }).join('')||`<tr><td colspan="8"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
-  return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+    const past=u.start&&new Date(u.start).getTime()<now;
+    const gc=BOOKED_COLS.map(([k])=>{const st=bookedStepByK(k);const dn=st&&stepDone(d,st);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
+    return `<tr class="${past?'past':''}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td>${contact}</td>${gc}</tr>`;
+  }).join('')||`<tr><td colspan="${8+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
+  return `<div class="tblwrap"><table class="stbl bookedtbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 function funnelTiles(){return funnelModel().map(f=>`<div class="fstage ${f.synthetic?'synthetic':''} ${filterStage===f.stage_id?'sel':''}" onclick="toggleFunnel('${f.stage_id}')"><div class="fb" style="background:var(--${stColor(f.label)})"></div><div class="lab">${esc(f.full)}</div><div class="n tnum">${f.n}</div><div class="arr tnum">${money(f.arr)}</div></div>`).join('');}
 function toggleFunnel(sid){filterStage=(filterStage===sid?null:sid);renderMain();}
@@ -1513,7 +1523,11 @@ function stepStage(d){
   // is the source of truth.
   return ({'1090549665':'disc_complete','1090549667':'demo','1104822108':'quote','1329839734':'verbal','1090549670':'won','1090549671':'lost'})[String(d.stage_id)]||'disc_complete';
 }
-function hasCall(d){return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
+function hasCall(d){
+  // Synthetic Booked row has no timeline/Gong yet; a first-call whose slot has passed is
+  // treated as held (AE can uncheck a no-show). Real deals use timeline + DCS call count.
+  if(d.synthetic_booked)return !!(d.meeting_start&&new Date(d.meeting_start).getTime()<Date.now());
+  return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
 function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id)||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
 function hasOutEmail(d){const dd=discoveryDate(d);const t0=dd?new Date(dd).getTime():0;return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||'')&&(!t0||(e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>=t0-3600000)));}
 function stepDone(d,st){const ov=(dst(d.id).steps||{})[st.k];if(ov===true||ov===false)return ov;return st.auto?!!st.auto(d):false;}
@@ -1557,7 +1571,7 @@ function renderDeal(id){
     <div class="path-h"><span class="t">${cfg.next?'Path to '+esc(cfg.next):'Close-out checklist'}</span><span class="pr">${doneN} of ${tot} done</span></div>
     <div class="steps">${rows}</div>
     ${allDone&&cfg.next?`<div class="alldone">✓ All steps clear — ready to advance to ${esc(cfg.next)}.</div>`:''}
-    ${sk==='booked'?prepBlock(d):''}`;
+    ${sk==='booked'?prepBlock(d)+bantPanel(d):''}`;
 }
 
 /* ===== Task-centric workspace engine (Phase 1) =====

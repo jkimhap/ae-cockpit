@@ -262,10 +262,11 @@ def assemble(rep, full=True, log=print):
     now_iso = _now().strftime("%Y-%m-%dT%H:%M:%SZ")
     # Discovery Booked = a first discovery call with no deal yet. It must STAY visible after
     # the call happens — until a deal is created (gates clear) or it's closed-lost — not vanish
-    # the moment the slot passes (Johnny 2026-06-23, ServiceMaster). So pull a 60-day look-back
+    # the moment the slot passes (Johnny 2026-06-23, ServiceMaster). So pull a 14-day look-back
     # window, not future-only; below we keep past *first-calls-without-a-deal* and drop past
-    # deal-linked meetings (so hasFutureMeeting() / the agenda stay future-correct).
-    since_iso = (_now() - datetime.timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # deal-linked meetings (so hasFutureMeeting() / the agenda stay future-correct). 14d (Johnny
+    # 2026-06-23): long enough a just-held first-call lingers, short enough stale ones age out.
+    since_iso = (_now() - datetime.timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
     # meeting_id -> deal_id via the deal<->meeting association (exact match), preferring an
     # open deal. Falls back to company-name-in-title so a meeting titled "Quinn <> Kinetico"
     # still binds to the Kinetico deal and inherits its current-stage colour.

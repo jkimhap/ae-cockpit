@@ -130,7 +130,7 @@ def notes_for(ids):
 
 def upcoming_meetings(owner_id, since_iso):
     """Meetings for this owner with start AFTER `since_iso`. Callers pass a look-back floor
-    (now − 60d), not just `now`, so a *just-held* first Discovery call still comes back —
+    (now − 14d), not just `now`, so a *just-held* first Discovery call still comes back —
     assemble.py keeps past first-calls-without-a-deal (Discovery Booked stays put until a deal
     is created or it's closed-lost) and drops past deal-linked meetings.
     hs_activity_type + hs_meeting_source let us tell a genuine *first* Discovery call
