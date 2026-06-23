@@ -2091,19 +2091,14 @@ function bantPanelContact(d,cb){
     <div class="bant-src">Computed by SalesOS from the Gong discovery transcript via the SOP §2 BANT rubric${ver}. Replaces #gong-notifier.</div>
   </div></details>`;
 }
-/* Fallback: no contact scorecard yet → show the older deal-scoped AI/AE bars. */
+/* No SOP §2 scorecard on this deal (no Gong discovery transcript matched) → honest empty state.
+   We deliberately do NOT render the deprecated per-deal ai_fields numbers here: those came from the
+   OLD cockpit AI engine on a continuous scale (e.g. 8/20), are NOT the SOP §2 rubric, and showing them
+   under a "SOP §2" header was wrong. A deal is either scored by the SOP rubric (bantPanelContact) or
+   shown as unscored — never a different engine's numbers dressed up as the SOP. */
 function bantPanelDeal(d){
-  const bs=bantScore(d.id);
-  const rows=BANT_FIELDS.map(f=>{const r=bantRaw(d.id,f.id);const v=!isNaN(r.v)?r.v:0;const pct=Math.round(v/f.max*100);
-    const tag=r.src==='gong'?'<span class="kf-src gong" style="margin-left:6px">Gong</span>':'';
-    return `<div class="bant-row"><div class="lab">${f.label}${tag}</div><div class="track"><i style="width:${pct}%"></i></div><div class="bv">${v}/${f.max}</div></div>`;}).join('');
-  const pass=bs.total>=50;const statusCls=bs.filled===0?'':'status '+(pass?'pass':'fail');
-  const statusTxt=bs.filled===0?'No discovery transcript scored yet':pass?'QUALIFIED':'BELOW THRESHOLD';
-  const note=bs.filled===0
-    ?'<span class="kf-note" style="display:block;margin-top:6px">No Gong discovery transcript has been scored on this lead yet. When the discovery call is held, SalesOS scores the full SOP §2 rubric here automatically.</span>'
-    :(bs.ai?'<span class="kf-note" style="display:block;margin-top:6px">Agent-extracted from Gong — accept the values in the Gate card to confirm.</span>':'');
-  return `<details class="prepcard" id="bant-${d.id}"${bs.filled?' open':''}><summary class="ph">BANT qualification — SOP §2 rubric<span class="phscore"> · ${bs.filled?bs.total+'/100':'—'}</span></summary><div class="pb">${rows}
-    <div class="threshold"><span>Threshold: 50/100</span><span class="${statusCls}">${statusTxt}</span></div>${note}
+  return `<details class="prepcard" id="bant-${d.id}"><summary class="ph">BANT qualification — SOP §2 rubric<span class="phscore" style="color:var(--muted)"> · not scored</span></summary><div class="pb">
+    <div class="bant-src" style="margin:0;color:var(--muted)">No Gong discovery-call transcript has been matched to this deal yet, so the SOP §2 BANT rubric has not scored it. When a discovery transcript is present, SalesOS computes the full rubric here automatically — Budget /20 · Authority /20 · Need /40 (Operational Pain 20 · Tech Stack 10 · Multi-Location 5 · Compliance 5) · Timeline /20 — with the qualify/disqualify recommendation and per-component rationale.</div>
   </div></details>`;
 }
 
