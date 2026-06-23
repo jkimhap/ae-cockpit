@@ -1,44 +1,314 @@
 """ui.py — the cockpit SPA. Stage-aware deal view with talk-track prompts,
 live ROI calculator, and BANT qualification scoring. Served by serve.py."""
 
-def html(rep):
-    return TEMPLATE.replace("__REP__", rep)
+def _tab_bar(active):
+    """Server-rendered Quinn-OS top-level tab bar. `active` is one of
+    'dashboard' | 'grant' | 'arlen' | 'ian'. Appears on every page."""
+    tabs = [("Dashboard", "/?tab=dashboard", "dashboard"),
+            ("Grant", "/?rep=grant", "grant"),
+            ("Arlen", "/?rep=arlen", "arlen"),
+            ("Ian", "/?tab=ian", "ian")]
+    cells = "".join(
+        '<a class="tab%s" href="%s">%s</a>' % (" active" if key == active else "", href, label)
+        for label, href, key in tabs)
+    return '<nav class="tabs-bar">%s</nav>' % cells
+
+def html(rep, active=None):
+    """The per-rep cockpit SPA. `active` decides which top-level tab is lit —
+    defaults to the rep name when it's a known tab (grant/arlen), else 'grant'."""
+    if active is None:
+        active = rep if rep in ("grant", "arlen") else "grant"
+    return (TEMPLATE.replace("__TAB_BAR__", _tab_bar(active))
+                    .replace("__REP__", rep))
+
+def _head():
+    """The shared <head>…</head> block (fonts + the full <style>) lifted verbatim
+    from the cockpit TEMPLATE so the Dashboard/Ian pages render in the exact same
+    Quinn-OS skin without duplicating ~300 lines of CSS."""
+    return TEMPLATE.split("</head>")[0] + "</head>"
+
+def _topbar(meta=""):
+    """Minimal Quinn-OS topbar for the non-SPA pages (no refresh buttons).
+    Built with concatenation (not %-formatting) — _head() carries raw CSS with
+    literal % signs that would break any %/format substitution."""
+    return ('<header class="topbar">'
+            '<div class="brand"><span class="dot"></span><b>Quinn</b>'
+            '<span>SalesOS</span></div><span class="sp"></span>'
+            '<span class="refreshed">' + meta + '</span></header>')
+
+def placeholder_html(title, message, active="ian"):
+    """A minimal page sharing the full shell (head + topbar + tab bar + reskin)
+    with a centered Quinn-OS message. Used for the Ian (SDR) tab."""
+    return ('<!doctype html><html lang="en">' + _head() + '<body>'
+            + _topbar() + _tab_bar(active)
+            + '<div class="ph-wrap"><div class="ttl">' + title + '</div>'
+            + '<div class="msg">' + message + '</div></div>'
+            + '</body></html>')
+
+def dashboard_html():
+    """Cross-AE Dashboard — Quinn-OS "Trends" feel, sales-tuned. KPI stat row +
+    two hand-rolled inline-SVG charts, with an AE toggle (Grant / Arlen). All
+    computation happens client-side from /api/dashboard so it re-renders live
+    when the toggle changes. Degrades to Grant-only (or an empty state) when a
+    payload is missing."""
+    return '<!doctype html><html lang="en">' + _head() + '<body>' + _topbar() + _tab_bar('dashboard') + DASHBOARD_BODY + '</body></html>'
+
+DASHBOARD_BODY = r"""
+<div class="dashwrap" id="dashRoot">
+  <div class="loading"><span class="spin"></span> Loading team data…</div>
+</div>
+<script>
+const $D=s=>document.querySelector(s);
+const escD=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const moneyD=v=>v==null||isNaN(v)?'$0':'$'+Math.round(+v).toLocaleString();
+const moneyK=v=>{v=+v||0;return v>=1000?'$'+(v/1000).toFixed(v>=10000?0:1)+'k':'$'+Math.round(v);};
+let RAW=null;           // {grant:payload|null, arlen:payload|null}
+let sel={grant:true,arlen:true};   // both on = full team
+const STCOLOR={Won:'won',Lost:'lost',Booked:'booked',Discovery:'disc',Demo:'demo',Quote:'quote',Verbal:'verbal'};
+
+// Which reps are effectively active: none selected → treat as full team.
+function activeReps(){
+  const reps=Object.keys(RAW).filter(r=>RAW[r]);              // only loaded reps
+  const on=reps.filter(r=>sel[r]);
+  return on.length?on:reps;                                   // none on → all
+}
+function mergedDeals(){
+  let out=[];activeReps().forEach(r=>{(RAW[r].deals||[]).forEach(d=>out.push(Object.assign({_rep:r},d)));});return out;
+}
+function mergedUpcoming(){
+  let out=[];activeReps().forEach(r=>{(RAW[r].upcoming||[]).forEach(u=>out.push(Object.assign({_rep:r},u)));});return out;
+}
+const isBooked=d=>d.is_open&&d.rubric_stage==='disc'&&((d.dcs&&d.dcs.n_calls)||0)===0;
+const dealVal=d=>d.arr||d.amount||0;
+
+// ---- lifecycle signals from dated stage-transition events in each deal's timeline ----
+const won_of=ds=>ds.filter(d=>!d.is_open&&d.stage==='Won');
+const lost_of=ds=>ds.filter(d=>!d.is_open&&d.stage==='Lost');
+const stageEvts=d=>(d.timeline||[]).filter(e=>e.kind==='stage'&&e.ts).map(e=>({ts:e.ts,title:e.title||''}));
+function createdTs(d){const s=stageEvts(d).map(e=>e.ts).sort();if(s.length)return s[0];
+  const all=(d.timeline||[]).map(e=>e.ts).filter(Boolean).sort();return all.length?all[0]:null;}
+function closedTs(d,word){const ev=stageEvts(d).filter(e=>e.title.indexOf(word)>=0).map(e=>e.ts).sort();
+  if(ev.length)return ev[ev.length-1];const s=stageEvts(d).map(e=>e.ts).sort();return s.length?s[s.length-1]:createdTs(d);}
+
+// ---- KPIs ----
+function kpis(){
+  const ds=mergedDeals();const open=ds.filter(d=>d.is_open);
+  const openPipe=open.reduce((s,d)=>s+dealVal(d),0);
+  const won=won_of(ds),lost=lost_of(ds);
+  const wonAmt=won.reduce((s,d)=>s+dealVal(d),0);
+  const wr=(won.length+lost.length)?Math.round(won.length/(won.length+lost.length)*100):0;
+  const avg=won.length?wonAmt/won.length:0;
+  const now=new Date();
+  const next30=mergedUpcoming().filter(u=>{const t=new Date(u.start);return !isNaN(t)&&(t-now)<=30*864e5&&(t-now)>=-864e5;}).length;
+  return [
+    {v:moneyK(openPipe),l:'Open pipeline',sub:open.length+' open deals'},
+    {v:mergedUpcoming().length,l:'Meetings booked',sub:next30+' next 30d'},
+    {v:won.length,l:'Closed won',sub:moneyD(wonAmt)},
+    {v:wr+'%',l:'Win rate',sub:won.length+'W / '+lost.length+'L'},
+    {v:moneyK(avg),l:'Avg deal size',sub:'won deals'},
+  ];
+}
+
+// ---- reusable inline-SVG bar chart ----
+// data: [{label, value, color?}], opts:{w,h,fmt,color}
+function barChart(data,opts){
+  opts=opts||{};
+  const w=opts.w||520,h=opts.h||220,pad={t:14,r:10,b:34,l:10};
+  const n=data.length;
+  if(!n)return '<div class="empty">No data.</div>';
+  const max=Math.max(1,...data.map(d=>d.value));
+  const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
+  const gap=Math.min(18,iw/n*0.3), bw=(iw-gap*(n-1))/n;
+  const fmt=opts.fmt||(v=>v);
+  let bars='';
+  data.forEach((d,i)=>{
+    const bh=Math.max(1,Math.round(d.value/max*ih));
+    const x=pad.l+i*(bw+gap), y=pad.t+ih-bh;
+    const col=d.color||opts.color||'var(--core)';
+    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh}" rx="2" fill="${col}"></rect>`;
+    if(d.value>0)bars+=`<text class="vlab" x="${(x+bw/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${escD(fmt(d.value))}</text>`;
+    bars+=`<text class="axlab" x="${(x+bw/2).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
+    <line x1="${pad.l}" y1="${pad.t+ih+0.5}" x2="${w-pad.r}" y2="${pad.t+ih+0.5}" stroke="var(--line)" stroke-width="1"></line>${bars}</svg>`;
+}
+
+// ---- inline-SVG line/area chart (cumulative) ----
+function lineChart(data,opts){
+  opts=opts||{};const w=opts.w||520,h=opts.h||200,pad={t:16,r:14,b:34,l:12};
+  const n=data.length;if(!n)return '<div class="empty">No data.</div>';
+  const max=Math.max(1,...data.map(d=>d.value));
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b,fmt=opts.fmt||(v=>v);
+  const X=i=>pad.l+(n<=1?iw/2:i/(n-1)*iw), Y=v=>pad.t+ih-Math.max(0,v/max*ih);
+  let dpath='';data.forEach((d,i)=>{dpath+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(d.value).toFixed(1)+' ';});
+  const apath='M'+X(0).toFixed(1)+' '+(pad.t+ih)+' '+dpath.replace(/^M/,'L')+'L'+X(n-1).toFixed(1)+' '+(pad.t+ih)+' Z';
+  let dots='';data.forEach((d,i)=>{dots+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="2.4" fill="var(--core)"></circle>`+
+    `<text class="axlab" x="${X(i).toFixed(1)}" y="${h-12}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${escD(d.label)}</text>`;});
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">
+    <path d="${apath}" fill="var(--core-bg)" opacity="0.55"></path>
+    <path d="${dpath}" fill="none" stroke="var(--core)" stroke-width="2"></path>
+    <text x="${(w-pad.r).toFixed(1)}" y="${(Y(data[n-1].value)-7).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--ink)">${escD(fmt(data[n-1].value))}</text>${dots}</svg>`;
+}
+
+// ---- weekly bucketing of dated events → dense series (gaps filled), capped to last `weeks` ----
+function mondayOf(dt){const d=new Date(dt);if(isNaN(d))return null;const day=(d.getDay()+6)%7;const m=new Date(d);m.setHours(0,0,0,0);m.setDate(d.getDate()-day);return m;}
+const wlabel=m=>(m.getMonth()+1)+'/'+m.getDate();
+function weekly(events,weeks){
+  const b={};events.forEach(e=>{const m=mondayOf(e.ts);if(!m)return;const k=m.getTime();(b[k]=b[k]||{sum:0}).sum+=(e.value||0);});
+  const keys=Object.keys(b).map(Number).sort((a,x)=>a-x);if(!keys.length)return [];
+  const WK=7*864e5,out=[];for(let t=keys[0];t<=keys[keys.length-1];t+=WK)out.push({label:wlabel(new Date(t)),value:b[t]?b[t].sum:0});
+  return (weeks&&out.length>weeks)?out.slice(out.length-weeks):out;
+}
+function cumulativeSeries(events){const s=weekly(events);let run=0;return s.map(p=>({label:p.label,value:(run+=p.value)}));}
+
+// ---- metric event extractors (ts + value) ----
+const evMeetings=()=>mergedUpcoming().map(u=>({ts:u.start,value:1}));
+const evCalls=()=>{const o=[];mergedDeals().forEach(d=>(d.calls||[]).forEach(c=>{if(c.date)o.push({ts:c.date,value:1});}));return o;};
+const evCreated=()=>mergedDeals().map(d=>({ts:createdTs(d),value:1})).filter(e=>e.ts);
+const evWon=val=>won_of(mergedDeals()).map(d=>({ts:closedTs(d,'Won'),value:val?dealVal(d):1})).filter(e=>e.ts);
+const evLost=val=>lost_of(mergedDeals()).map(d=>({ts:closedTs(d,'Lost'),value:val?dealVal(d):1})).filter(e=>e.ts);
+function avgDealWeekly(){const cnt=weekly(evWon(false)),m={};weekly(evWon(true)).forEach(p=>m[p.label]=p.value);
+  return cnt.map(p=>({label:p.label,value:p.value?Math.round((m[p.label]||0)/p.value):0}));}
+
+// ---- pipeline stage mix (open deals), colored per stage (layered KPI) ----
+const STAGE_ORDER=[['Booked','Disc Booked'],['Discovery','Discovery'],['Demo','Demo'],['Quote','Quote'],['Verbal','Verbal']];
+function stageMix(byVal){
+  const open=mergedDeals().filter(d=>d.is_open),c={};STAGE_ORDER.forEach(([k])=>c[k]=0);
+  open.forEach(d=>{const k=isBooked(d)?'Booked':d.stage;if(c[k]!=null)c[k]+=byVal?dealVal(d):1;});
+  return STAGE_ORDER.map(([k,lab])=>({label:lab,value:c[k],color:'var(--'+(STCOLOR[k]||'demo')+')'}));
+}
+
+// ---- conversion: win rate by rep + by creation cohort ----
+function winByRep(){
+  return activeReps().map(r=>{const ds=(RAW[r].deals||[]);
+    const w=ds.filter(d=>!d.is_open&&d.stage==='Won').length, l=ds.filter(d=>!d.is_open&&d.stage==='Lost').length;
+    return {label:r,rate:(w+l)?w/(w+l):0,w,l};}).sort((a,b)=>b.rate-a.rate);
+}
+function winByCohort(){
+  const m={};mergedDeals().forEach(d=>{const t=createdTs(d);if(!t)return;const k=String(t).slice(0,7);
+    (m[k]=m[k]||{w:0,l:0,o:0});if(d.is_open)m[k].o++;else if(d.stage==='Won')m[k].w++;else if(d.stage==='Lost')m[k].l++;});
+  return Object.keys(m).sort().map(k=>{const c=m[k],dec=c.w+c.l;
+    return {label:k,rate:dec?c.w/dec:0,w:c.w,l:c.l,o:c.o,maturing:c.o>dec};});
+}
+
+// ---- render helpers ----
+function card(title,svg){return `<div class="chartbox"><h3>${escD(title)}</h3>${svg}</div>`;}
+function winRows(){
+  const rep=winByRep();
+  const repHtml=rep.length?rep.map(x=>`<div class="wrow"><div class="wl">${escD(x.label)}</div>
+    <div class="wtrack"><div class="wfill" style="width:${(x.rate*100).toFixed(0)}%"></div></div>
+    <div class="wstat"><b>${(x.rate*100).toFixed(0)}%</b> · ${x.w}W/${x.l}L</div></div>`).join(''):'<div class="empty">No closed deals.</div>';
+  const co=winByCohort();
+  const coHtml=co.length?co.map(x=>`<div class="wrow"><div class="wl">${escD(x.label)}${x.maturing?' 🟡':''}</div>
+    <div class="wtrack"><div class="wfill" style="width:${(x.rate*100).toFixed(0)}%;${x.maturing?'opacity:.5':''}"></div></div>
+    <div class="wstat"><b>${(x.rate*100).toFixed(0)}%</b> · ${x.w}W/${x.l}L${x.o?' · '+x.o+'o':''}</div></div>`).join(''):'<div class="empty">No data.</div>';
+  return `<div class="chartbox"><h3>Win rate by rep</h3>${repHtml}</div>
+    <div class="chartbox"><h3>Win rate by creation cohort</h3>${coHtml}<div class="delta flat" style="margin-top:10px">🟡 maturing — more deals still open than decided</div></div>`;
+}
+
+function freshLine(){
+  const parts=[];
+  ['grant','arlen'].forEach(r=>{if(RAW[r]&&RAW[r].refreshed)parts.push(r.charAt(0).toUpperCase()+r.slice(1)+' · '+String(RAW[r].refreshed).replace(' UTC','').slice(0,16));});
+  return parts.length?('HubSpot synced — '+parts.join('  ·  ')):'No data loaded';
+}
+
+function render(){
+  const root=$D('#dashRoot');
+  const loaded=Object.keys(RAW).filter(r=>RAW[r]);
+  if(!loaded.length){
+    root.innerHTML=`<div class="masthead"><div><div class="ttl">Quinn SalesOS — Dashboard</div><div class="meta">No data loaded</div></div></div>
+      <div class="dash-empty"><div class="big">No payloads found</div><div class="sm">Run a sync first — open a rep cockpit and hit Full sync.</div></div>`;
+    return;
+  }
+  const tg=['grant','arlen'].map(r=>{
+    const exists=!!RAW[r];const on=sel[r];
+    return `<button class="${on&&exists?'active':''}" ${exists?'':'disabled style="opacity:.4;cursor:default"'} onclick="toggleRep('${r}')">${r}</button>`;
+  }).join('');
+  const k=kpis(), mf=v=>moneyK(v);
+  const lead=[
+    card('Meetings booked / wk',barChart(weekly(evMeetings(),12),{color:'var(--core)'})),
+    card('Sales calls held / wk',barChart(weekly(evCalls(),12),{color:'var(--demo)'})),
+    card('Deals created / wk',barChart(weekly(evCreated(),12),{color:'var(--booked)'})),
+    card('Pipeline stage mix · open',barChart(stageMix(false),{})),
+  ].join('');
+  const trail=[
+    card('Deals won / wk',barChart(weekly(evWon(false),12),{color:'var(--won)'})),
+    card('Value won / wk',barChart(weekly(evWon(true),12),{color:'var(--won)',fmt:mf})),
+    card('Deals lost / wk',barChart(weekly(evLost(false),12),{color:'var(--lost)'})),
+    card('Value lost / wk',barChart(weekly(evLost(true),12),{color:'var(--lost)',fmt:mf})),
+    card('Avg deal size / wk',barChart(avgDealWeekly(),{color:'var(--quote)',fmt:mf})),
+    card('Cumulative value won',lineChart(cumulativeSeries(evWon(true)),{fmt:mf})),
+  ].join('');
+  root.innerHTML=`
+    <div class="masthead">
+      <div><div class="ttl">Quinn SalesOS — Dashboard</div><div class="meta">${escD(freshLine())}</div></div>
+      <div class="toggle-group">${tg}</div>
+    </div>
+    <div class="kpirow">${k.map(x=>`<div class="kpi"><div class="v tnum">${escD(x.v)}</div><div class="l">${escD(x.l)}</div>${x.sub?`<div class="sub2 tnum">${escD(x.sub)}</div>`:''}</div>`).join('')}</div>
+    <div class="section-title">Leading indicators</div><div class="section-sub">Activity that builds pipeline · last 12 weeks</div>
+    <div class="chartgrid">${lead}</div>
+    <div class="section-title">Trailing indicators</div><div class="section-sub">Outcomes · last 12 weeks</div>
+    <div class="chartgrid">${trail}</div>
+    <div class="section-title">Conversion</div><div class="section-sub">Win rate</div>
+    <div class="chartgrid">${winRows()}</div>`;
+}
+function toggleRep(r){if(!RAW[r])return;sel[r]=!sel[r];render();}
+
+async function boot(){
+  try{
+    const res=await fetch('/api/dashboard');const j=await res.json();
+    RAW={grant:j.grant||null,arlen:j.arlen||null};
+    ['grant','arlen'].forEach(r=>{if(!RAW[r])sel[r]=false;});   // don't pre-select a missing rep
+    render();
+  }catch(e){
+    $D('#dashRoot').innerHTML='<div class="dash-empty"><div class="big">Failed to load</div><div class="sm">'+escD(e.message||e)+'</div></div>';
+  }
+}
+boot();
+</script>
+"""
 
 TEMPLATE = r"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quinn · SalesOS Cockpit</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fbfbfc;--panel:#ffffff;--panel2:#f6f7f8;--ink:#17191e;--muted:#646a73;--faint:#9aa0a8;
---line:#ededf0;--line2:#e3e4e8;--accent:#17191e;--accent-soft:#eef1f3;--accent-ink:#2f6f8f;
---green:#127a4f;--green-bg:#eaf3ee;--amber:#8a6300;--amber-bg:#f4eedd;--red:#b42318;--red-bg:#fbeae9;
---shadow-sm:0 1px 2px rgba(23,25,30,.04);--shadow:0 6px 22px rgba(23,25,30,.07);
---radius:10px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#2f6f8f;--demo-bg:#ecf2f5;--quote:#8a6300;--quote-bg:#f4eedd;
+/* Quinn OS warm-paper palette (re-skin). Variable NAMES kept so the cascade still
+   reaches every component; only VALUES are remapped. The 7 stage hues + their -bg
+   are intentionally unchanged (stakeholder-approved). */
+:root{--bg:#f7f3eb;--panel:#f7f3eb;--panel2:#f1ecdf;--ink:#2b2b2b;--muted:#8a8275;--faint:#a9a290;
+--line:#d6cdb7;--line2:#e0d8c4;--accent:#2b2b2b;--accent-soft:#f1ecdf;--accent-ink:#3a6a3a;
+--core:#3a6a3a;--core-bg:#d4e4cb;
+--green:#3a6a3a;--green-bg:#d4e4cb;--amber:#8a6300;--amber-bg:#f4eedd;--red:#b42318;--red-bg:#fbeae9;
+--shadow-sm:none;--shadow:0 1px 0 rgba(43,43,43,.04);
+--radius:4px;--booked:#3554a0;--booked-bg:#eaeef8;--disc:#7c4dd1;--disc-bg:#f2ecfb;--demo:#2f6f8f;--demo-bg:#ecf2f5;--quote:#8a6300;--quote-bg:#f4eedd;
 --verbal:#c0397f;--verbal-bg:#fbe9f2;--won:#127a4f;--won-bg:#eaf3ee;--lost:#b42318;--lost-bg:#fbeae9;}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-0.006em}
+body{background:var(--bg);color:var(--ink);font-family:'Fraunces',Georgia,serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-0.004em}
+.tnum,.ktag,.kf-src,.engtag,.tbadge,.kf-l{font-family:'JetBrains Mono',monospace}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}a{color:inherit}.tnum{font-variant-numeric:tabular-nums}
 input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#dcdad4;border-radius:8px;border:3px solid var(--bg)}
 .topbar{position:sticky;top:0;z-index:30;background:rgba(250,249,247,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 30px}
 .brand{display:flex;align-items:center;gap:9px}.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
-.brand b{font-weight:600;font-size:15px;letter-spacing:-0.02em}.brand span{color:var(--faint);font-size:11px;font-weight:500}
+.brand b{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:16px;letter-spacing:-0.01em}.brand span{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
 .brand .who{margin-left:10px;padding-left:12px;border-left:1px solid var(--line2);font-size:13px;font-weight:600}
 .sp{margin-left:auto}
-.engine{font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line2);color:var(--faint)}
+.engine{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 9px;border-radius:6px;display:inline-flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line2);color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
 .engine .ed{width:6px;height:6px;border-radius:50%;background:currentColor}
 .engine.claude{color:var(--green)}.engine.heuristic{color:var(--amber)}.engine.none{color:var(--faint)}
 .cur-tag{font-size:10px;font-weight:600;color:var(--accent-ink);border:1px solid var(--accent-ink);border-radius:5px;padding:1px 6px;margin-left:7px}
 .ktag{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:2px 0;width:42px;text-align:center;flex-shrink:0}
-.refreshed{font-size:11.5px;color:var(--faint)}
-.rfx{font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:9px;background:var(--ink);color:#fff}.rfx:hover{opacity:.9}.rfx.ghost{background:var(--panel2);color:var(--ink)}.rfx[disabled]{opacity:.5;cursor:default}
+.refreshed{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint)}
+.rfx{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;padding:7px 13px;border-radius:var(--radius);background:var(--ink);color:var(--bg);text-transform:uppercase;letter-spacing:.04em}.rfx:hover{opacity:.9}.rfx.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}.rfx[disabled]{opacity:.5;cursor:default}
 .main{padding:26px 30px 90px;max-width:1180px;margin:0 auto}
-.h1{font-size:23px;font-weight:600;letter-spacing:-0.025em}.sub{color:var(--muted);font-size:13px;margin-top:3px}
+.h1{font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600;letter-spacing:-0.02em}.sub{color:var(--muted);font-size:13px;margin-top:3px}
 .grp{margin-top:26px}.grp-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
-.grp-h .nm{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.grp-h .ct{font-size:12px;color:var(--faint)}
+.grp-h .nm{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.grp-h .ct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
 .funnel{display:grid;grid-template-columns:repeat(5,1fr) .82fr .82fr;gap:9px}
 @media(max-width:1100px){.funnel{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:680px){.funnel{grid-template-columns:repeat(2,1fr)}}
@@ -46,8 +316,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .fstage:hover{box-shadow:var(--shadow);transform:translateY(-1px)}.fstage.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fstage.synthetic{border-style:dashed;background:var(--panel2)}
 .fstage .fb{position:absolute;left:0;top:0;height:4px;width:100%}
-.fstage .lab{font-size:11.5px;font-weight:600;color:var(--muted)}.fstage .n{font-size:28px;font-weight:600;letter-spacing:-0.03em;margin-top:6px}
-.fstage .arr{color:var(--faint);font-size:11.5px;margin-top:2px;font-weight:500}
+.fstage .lab{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.fstage .n{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;letter-spacing:-0.02em;margin-top:6px}
+.fstage .arr{font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:11px;margin-top:2px;font-weight:500}
 .frollup{margin-top:9px;display:flex;flex-direction:column;gap:3px}
 .frl{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px}
 .frl .fk{color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
@@ -71,8 +341,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .pmeta{font-size:11px;color:var(--faint);margin-bottom:4px;display:flex;justify-content:space-between}
 .up-row{display:flex;gap:11px;overflow-x:auto;padding-bottom:6px}
 .up{min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;flex-shrink:0;cursor:pointer;transition:.13s}.up:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
-.up .when{font-size:11px;font-weight:600;color:var(--accent-ink)}.up .ti{font-weight:600;margin-top:5px;font-size:13.5px;line-height:1.3}.up .who{color:var(--muted);font-size:12px;margin-top:4px}
-.toggle{font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}.toggle:hover{color:var(--ink)}
+.up .when{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:var(--accent-ink)}.up .ti{font-weight:600;margin-top:5px;font-size:13.5px;line-height:1.3}.up .who{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11px;margin-top:4px}
+.toggle{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center;text-transform:uppercase;letter-spacing:.04em}.toggle:hover{color:var(--ink)}
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:500;margin-bottom:14px;cursor:pointer}.back:hover{color:var(--ink)}
 .dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
 .dhead .co{font-size:24px;font-weight:600;letter-spacing:-0.03em}.dhead .meta{color:var(--muted);font-size:12.5px;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.dhead .meta .sep{color:var(--line2)}
@@ -81,7 +351,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 @media(max-width:1020px){.dlayout{grid-template-columns:1fr}}
 .lk{color:var(--accent-ink);font-weight:600;font-size:12px;cursor:pointer}.lk:hover{text-decoration:underline}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px}.panel+.panel{margin-top:13px}
-.panel h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}.panel h3 .ct{margin-left:auto;color:var(--faint);font-size:11px;font-weight:600;text-transform:none;letter-spacing:0}
+.panel h3{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}.panel h3 .ct{margin-left:auto;color:var(--faint);font-size:11px;font-weight:600;text-transform:none;letter-spacing:0}
 /* stage accordion */
 .stage{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
 .stage.cur{border-color:var(--line2);box-shadow:var(--shadow-sm)}
@@ -167,7 +437,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.inbox{display:none}.inbox.mobile-on{display:flex}}
 .inbox{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);position:sticky;top:53px;height:calc(100vh - 53px);overflow:hidden}
 .inbox-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
-.inbox-h .ti{font-size:15px;font-weight:600;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px}
+.inbox-h .ti{font-family:'Fraunces',Georgia,serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;display:flex;align-items:center;gap:8px}
 .inbox-h .ti .cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--faint);background:#fff;border:1px solid var(--line2);border-radius:20px;padding:2px 9px}
 .inbox-h .note{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4;display:flex;gap:5px;align-items:flex-start}
 .inbox-h .note b{color:var(--amber);font-weight:700}
@@ -208,7 +478,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .grt.warn{color:var(--amber);border-color:var(--amber-bg);background:var(--amber-bg)}
 .grt.bad{color:var(--red);border-color:var(--red-bg);background:var(--red-bg)}
 .sec-h{display:flex;align-items:baseline;gap:9px;margin:24px 0 12px}
-.sec-h .nm{font-size:13px;font-weight:700;letter-spacing:.02em}.sec-h .ct{font-size:12px;color:var(--faint)}
+.sec-h .nm{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}.sec-h .ct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
 .aq{display:flex;flex-direction:column;gap:12px}
 .acard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm)}
 .acard.urgent{border-left:3px solid var(--red)}.acard.soon{border-left:3px solid var(--amber)}
@@ -286,6 +556,50 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 .kf-edit{flex:none;width:24px;height:24px;border-radius:7px;color:var(--faint);font-size:12px;opacity:.5}.kf-edit:hover{opacity:1;background:var(--panel2)}
 .kf-in{flex:1;min-width:120px;border:1px solid var(--accent);border-radius:8px;padding:5px 9px;font-size:12.5px;outline:none}
 .kf-desc{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5}
+/* ===== Quinn OS top-level tab bar (server-rendered) ===== */
+.tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--ink);padding:0 30px;background:var(--bg);position:sticky;top:53px;z-index:25}
+.tab{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;padding:10px 18px;border:1px solid var(--ink);border-bottom:none;background:var(--panel2);text-decoration:none;color:var(--ink);margin-right:-1px;cursor:pointer}
+.tab.active{background:var(--bg);position:relative;top:1px}
+/* ===== Dashboard / placeholder pages ===== */
+.dashwrap{padding:26px 30px 90px;max-width:1180px;margin:0 auto}
+.masthead{border-bottom:1px solid var(--ink);padding-bottom:16px;margin-bottom:22px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.masthead .ttl{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;letter-spacing:-0.02em;line-height:1.1}
+.masthead .meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+.toggle-group{display:inline-flex;border:1px solid var(--ink);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.toggle-group button{border:none;background:transparent;padding:7px 14px;cursor:pointer;color:var(--ink);font:inherit;text-transform:inherit;letter-spacing:inherit}
+.toggle-group button.active{background:var(--ink);color:var(--bg)}
+.toggle-group button:not(:last-child){border-right:1px solid var(--ink)}
+.kpirow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--line);margin-bottom:8px}
+@media(max-width:980px){.kpirow{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.kpirow{grid-template-columns:repeat(2,1fr)}}
+.kpi{padding:18px 20px;border-right:1px solid var(--line)}.kpi:last-child{border-right:none}
+@media(max-width:760px){.kpi:nth-child(2){border-right:none}.kpi:nth-child(1),.kpi:nth-child(2){border-bottom:1px solid var(--line)}}
+.kpi .v{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:600;letter-spacing:-0.02em;line-height:1;color:var(--core)}
+.kpi .l{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:8px}
+.kpi .sub2{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint);margin-top:3px}
+.section-title{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;letter-spacing:-0.01em;margin:30px 0 4px}
+.section-sub{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:13px}
+.chartgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+@media(max-width:760px){.chartgrid{grid-template-columns:1fr}}
+.chartbox .headline{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:600;color:var(--ink);letter-spacing:-0.02em;margin-bottom:2px}
+.chartbox .delta{font-family:'JetBrains Mono',monospace;font-size:10px;margin-bottom:10px}
+.chartbox .delta.up{color:var(--green)}.chartbox .delta.down{color:var(--red)}.chartbox .delta.flat{color:var(--faint)}
+.wrow{display:grid;grid-template-columns:64px 1fr 92px;align-items:center;gap:11px;margin-bottom:9px}
+.wrow .wl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink);text-transform:capitalize}
+.wtrack{position:relative;height:18px;background:var(--panel2);border:1px solid var(--line2);overflow:hidden}
+.wfill{height:100%;background:var(--core)}
+.wrow .wstat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:right;white-space:nowrap}
+.wrow .wstat b{color:var(--ink);font-size:11px}
+.chartbox{border:1px solid var(--line);padding:16px 18px;background:var(--panel)}
+.chartbox h3{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px}
+.chartbox svg{width:100%;height:auto;display:block}
+.chartbox .axlab,.chartbox .vlab{font-family:'JetBrains Mono',monospace}
+.dash-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:55vh;gap:12px;text-align:center;color:var(--muted)}
+.dash-empty .big{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:600;color:var(--ink)}
+.dash-empty .sm{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.ph-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 200px);gap:14px;text-align:center;padding:30px}
+.ph-wrap .ttl{font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-0.02em;color:var(--ink)}
+.ph-wrap .msg{font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 </style></head>
 <body>
 <header class="topbar">
@@ -295,6 +609,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
   <button class="rfx" id="rbtn" onclick="refresh(false)">↻ Refresh</button>
   <button class="rfx ghost" id="rfull" onclick="refresh(true)" title="Re-pull Gong + regenerate AI">⟳ Full sync</button>
 </header>
+__TAB_BAR__
 <div class="shell">
   <div class="workspace"><main class="main" id="view"><div class="loading"><span class="spin"></span> Loading live HubSpot data…</div></main></div>
 </div>

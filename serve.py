@@ -39,6 +39,19 @@ def cached_payload(rep):
     with LOCK:
         return assemble.assemble(rep, full=True)
 
+def dashboard_data():
+    """Cross-AE feed for the Dashboard tab: load whichever of the grant/arlen
+    cached payloads exist (skip a missing one gracefully — never crash, never
+    trigger a cold assemble). The client merges and computes from this."""
+    out = {}
+    for rep in ("grant", "arlen"):
+        p = os.path.join(CACHE_DIR, f"payload-{rep}.json")
+        try:
+            out[rep] = json.load(open(p)) if os.path.exists(p) else None
+        except Exception:
+            out[rep] = None
+    return out
+
 class H(BaseHTTPRequestHandler):
     # HTTP/1.1 keep-alive: large responses (the ~830KB payload) transfer far more
     # reliably across a Tailscale/LAN hop than HTTP/1.0's close-after-each-response.
@@ -66,10 +79,20 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path); q = urllib.parse.parse_qs(u.query)
         rep = (q.get("rep") or [DEFAULT_REP])[0]
+        tab = (q.get("tab") or [None])[0]
         if u.path in ("/", ""):
-            self._send(200, ui.html(rep), "text/html; charset=utf-8")
+            # Top-level tab routing (server-rendered). Dashboard + Ian are their own
+            # pages; everything else is the per-rep cockpit with the matching tab lit.
+            if tab == "dashboard":
+                self._send(200, ui.dashboard_html(), "text/html; charset=utf-8")
+            elif tab == "ian":
+                self._send(200, ui.placeholder_html("Ian", "Ian" + chr(39) + "s SDR cockpit — coming soon"), "text/html; charset=utf-8")
+            else:
+                self._send(200, ui.html(rep), "text/html; charset=utf-8")
         elif u.path == "/api/data":
             self._send(200, json.dumps(cached_payload(rep), default=str))
+        elif u.path == "/api/dashboard":
+            self._send(200, json.dumps(dashboard_data(), default=str))
         elif u.path == "/api/health":
             self._send(200, json.dumps({"ok": True}))
         else:
