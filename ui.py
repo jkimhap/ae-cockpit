@@ -1470,7 +1470,10 @@ function stageCols(sk){return ((STAGE_STEPS[sk]||{}).steps||[]).filter(s=>s.col)
 function fwOf(d){
   if(d.bant&&d.bant.field_workers!=null)return String(d.bant.field_workers);
   const en=d.enrich||{};
-  if(en.fw_band&&String(en.fw_band).trim())return String(en.fw_band).trim();   // booking-form band
+  const band=en.fw_band!=null?String(en.fw_band).trim():'';
+  // booking-form band — only when it carries an actual number; a non-numeric sentinel
+  // ("Unsure"/"Unknown"/etc.) is NOT a figure and must not render as a field-worker count.
+  if(band&&/\d/.test(band))return band;
   if(en.fw_est!=null&&en.fw_est!=='')return String(en.fw_est);
   if(d.num_of_learners)return String(d.num_of_learners);
   return '—';
