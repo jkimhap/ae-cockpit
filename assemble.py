@@ -682,6 +682,17 @@ def _alerts(deal):
     # the formal quote, stage 04), so it must NOT alarm there (QA loop 2026-06-24).
     if deal["is_open"] and deal["stage"] in ("Quote","Verbal") and not deal.get("amount"):
         a.append({"sev":"high","text":f"No deal amount set at {deal['stage']} — pipeline value missing"})
+    # Qualify-gate back-stop: a deal PAST the qualify gate (rubric_stage roi|prop = Demo+/Proposal)
+    # that still scores DISQUALIFY means the Stage-2 gate (BANT≥50 + fit) was bypassed when the AE
+    # advanced it in HubSpot, and nothing surfaced the contradiction — the silent bypass applied to
+    # the FIRST gate. Detect-and-flag ONLY: disqualifying / moving the stage is a live HubSpot write
+    # the AE owns. Deals still AT Discovery with a DISQUALIFY rec are NOT flagged — the gate is doing
+    # its job there. (QA loop 2026-06-24 — Church of Jesus Christ at Demo rec=DISQUALIFY; Gila River
+    # + tKW Capital at Quote/Verbal on a T4 fit-fail.)
+    _bant = deal.get("bant") or {}
+    if deal["is_open"] and deal.get("rubric_stage") in ("roi","prop") and _bant.get("rec") == "DISQUALIFY":
+        _why = _bant.get("rec_reason") or f"BANT {_bant.get('total')}"
+        a.append({"sev":"high","text":f"Advanced to {deal['stage']} but qualification = DISQUALIFY ({_why}) — disqualify, or document why it's still live"})
     deal["alerts"]=a
 
 def _num(v):
