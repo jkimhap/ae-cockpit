@@ -1480,12 +1480,11 @@ function bantTag(d){const b=d.bant;if(!b||b.total==null)return '—';const t=b.t
 function daysSinceClose(d){if(!d.closedate)return null;const t=new Date(d.closedate).getTime();if(isNaN(t))return null;return Math.max(0,Math.round((Date.now()-t)/86400000));}
 function stageTable(f){
   const sk=stageStepKey(f.stage_id);const cols=stageCols(sk);const closed=(sk==='won'||sk==='lost');
-  const isDisc=(sk==='disc_complete');
   const nextLab=(STAGE_STEPS[sk]||{}).next;
   const colTitle=s=>esc(s.lb)+' — '+(nextLab?('exit to '+nextLab):'closed-stage')+' step';
   const timeHead=closed?'<th class="num">Since close</th>':'<th class="num">Since disc.</th><th class="num">In stage</th>';
-  const bantHead=isDisc?'<th class="num" title="BANT score from the Gong discovery transcript (SOP §2 rubric)">BANT</th>':'';
-  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th>${bantHead}<th class="num">Deal Size</th>${timeHead}<th>Contact</th>${cols.map(s=>`<th class="gcol" title="${colTitle(s)}">${esc(s.col)}</th>`).join('')}</tr>`;
+  /* BANT column removed here (Johnny 2026-06-23): BANT now lives only in Discovery Booked. */
+  const head=`<tr><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th><th class="num">Deal Size</th>${timeHead}<th>Contact</th>${cols.map(s=>`<th class="gcol" title="${colTitle(s)}">${esc(s.col)}</th>`).join('')}</tr>`;
   const rows=f.deals.map(d=>{
     const c=d.primary_contact||{};
     const contact=c.name?`${esc(c.name)}${c.title?`<div class="ctc">${esc(c.title)}</div>`:''}`:'—';
@@ -1493,9 +1492,8 @@ function stageTable(f){
     if(closed){const dc=daysSinceClose(d);timeCells=`<td class="num">${dc==null?'—':dc+'d'}</td>`;}
     else{const dd=daysSinceDisc(d);const dis=(d.dcs&&d.dcs.days_in_stage!=null)?d.dcs.days_in_stage+'d':'—';timeCells=`<td class="num">${dd==null?'—':dd+'d'}</td><td class="num">${dis}</td>`;}
     const gc=cols.map(s=>{const dn=stepDone(d,s);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
-    const bantCell=isDisc?`<td class="num">${bantTag(d)}</td>`:'';
-    return `<tr onclick="location.hash='#/deal/${d.id}'"><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${esc(fwOf(d))}</td><td>${esc(lmsOf(d))}</td>${bantCell}<td class="num amt">${money(d.arr||d.amount)}</td>${timeCells}<td>${contact}</td>${gc}</tr>`;
-  }).join('')||`<tr><td colspan="${(closed?8:9)+(isDisc?1:0)+cols.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
+    return `<tr onclick="location.hash='#/deal/${d.id}'"><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${esc(fwOf(d))}</td><td>${esc(lmsOf(d))}</td><td class="num amt">${money(d.arr||d.amount)}</td>${timeCells}<td>${contact}</td>${gc}</tr>`;
+  }).join('')||`<tr><td colspan="${(closed?8:9)+cols.length}"><div class="empty" style="border:none">No deals in this stage.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 /* Discovery Booked enrichment table: first calls booked but not yet held. Same look as
@@ -1508,7 +1506,7 @@ function stageTable(f){
 const BOOKED_COLS=[['disc_done','Call done?'],['bant','BANT + rec?'],['demo_booked','Next call?'],['fit','Quinn fit?']];
 function bookedStepByK(k){return STAGE_STEPS.booked.steps.find(s=>s.k===k);}
 function bookedTable(ms){
-  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th><th class="num">Employees</th><th>Contact</th>${BOOKED_COLS.map(([k,lb])=>`<th class="gcol" title="${esc((bookedStepByK(k)||{}).lb||lb)} — Discovery Booked exit check">${lb}</th>`).join('')}</tr>`;
+  const head=`<tr><th>Call</th><th>Company</th><th>Tier</th><th>Vertical</th><th class="num" title="Field workers — transcript-derived, else booking-form band">FW</th><th title="Has training software / LMS today">LMS</th><th class="num">Employees</th><th class="num" title="BANT score (SOP §2 rubric) — shown only once the discovery call has been held">BANT</th><th>Contact</th>${BOOKED_COLS.map(([k,lb])=>`<th class="gcol" title="${esc((bookedStepByK(k)||{}).lb||lb)} — Discovery Booked exit check">${lb}</th>`).join('')}</tr>`;
   const now=Date.now();
   const rows=ms.map(u=>{const d=bookedDeal('booked-'+u.meeting_id);if(!d)return '';
     const c=d.primary_contact||{};
@@ -1518,8 +1516,8 @@ function bookedTable(ms){
     const emp=d.employees?esc(String(d.employees)):'—';
     const past=u.start&&new Date(u.start).getTime()<now;
     const gc=BOOKED_COLS.map(([k])=>{const st=bookedStepByK(k);const dn=st&&stepDone(d,st);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
-    return `<tr class="${past?'past':''}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td>${contact}</td>${gc}</tr>`;
-  }).join('')||`<tr><td colspan="${8+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
+    return `<tr class="${past?'past':''}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td class="num">${past?bantTag(d):'—'}</td><td>${contact}</td>${gc}</tr>`;
+  }).join('')||`<tr><td colspan="${9+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl bookedtbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 const moneyK=v=>{v=+v||0;return v>=1e6?'$'+(v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M':v>=1e3?'$'+Math.round(v/1e3)+'K':'$'+Math.round(v);};
@@ -1732,14 +1730,14 @@ function lossDrop(d){
 }
 function stageDropdowns(d,sk){
   const out=[];
+  /* BANT panel lives ONLY in Discovery Booked now (Johnny 2026-06-23). */
   if(sk==='booked'){out.push(prepBlock(d));out.push(bantPanel(d));}
-  else if(sk==='disc_complete'){out.push(bantPanel(d));out.push(recapDrop(d));out.push(preDemoDrop(d));}
-  else if(sk==='demo'){out.push(bantPanel(d));out.push(prePropDrop(d));out.push(roiDrop(d));}
-  else if(sk==='quote'){out.push(bantPanel(d));out.push(quoteFollowupDrop(d));out.push(redlinesDrop(d));}
-  else if(sk==='verbal'){out.push(bantPanel(d));out.push(handoffDrop(d));out.push(welcomeDrop(d));}
+  else if(sk==='disc_complete'){out.push(recapDrop(d));out.push(preDemoDrop(d));}
+  else if(sk==='demo'){out.push(prePropDrop(d));out.push(roiDrop(d));}
+  else if(sk==='quote'){out.push(quoteFollowupDrop(d));out.push(redlinesDrop(d));}
+  else if(sk==='verbal'){out.push(handoffDrop(d));out.push(welcomeDrop(d));}
   else if(sk==='won'){out.push(welcomeDrop(d));out.push(upsellDrop(d));}
-  else if(sk==='lost'){out.push(lossDrop(d));out.push(bantPanel(d));}
-  else{out.push(bantPanel(d));}
+  else if(sk==='lost'){out.push(lossDrop(d));}
   return out.join('');
 }
 function renderDeal(id){
@@ -2049,6 +2047,9 @@ function updateBant(id){const el=document.getElementById('bant-'+id);if(el){cons
 /* Full SOP BANT rubric: scores + Need subscores + rationale + verbatim quote per component,
    plus the qualify/disqualify recommendation (BANT floors fused with the fit routing). */
 function bantPanel(d){
+  /* BANT only renders in Discovery Booked now (Johnny 2026-06-23): the score belongs to the
+     discovery call. Suppressed for Discovery Complete and every later stage, from any call path. */
+  if(stepStage(d)!=='booked')return '';
   const cb=d.bant;
   if(cb&&((cb.items&&cb.items.length)||cb.total!=null))return bantPanelContact(d,cb);
   return bantPanelDeal(d);
