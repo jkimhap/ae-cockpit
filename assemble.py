@@ -410,6 +410,11 @@ def assemble(rep, full=True, log=print):
                 "dealtype":p.get("dealtype") or "newbusiness",
                 "industry":co.get("industry_category") or co.get("industry") or "","vertical_quinn":vertical_quinn,
                 "vertical_inferred":(vinf or {}).get("vertical") or "","vertical_inferred_meta":vinf or {},
+                # Canonical ICP vertical NAME, always materialized (slug-or-inferred → canon_vertical).
+                # vertical_inferred is ONLY the website-scrape fallback (empty when HubSpot has the slug),
+                # so JSON consumers like Rita had no clean display name — they'd get a blank or the raw
+                # slug. This is the single authoritative name field. (QA loop 2026-06-24, check-1.)
+                "vertical_name":(catz.canon_vertical(vertical) if vertical else ""),
                 "tier":deal_tier,"tier_label":deal_tier_label,"employees":_num(co.get("numberofemployees")),
                 "locations":co.get("numberoflocations") or "","icp":"",
                 "company_desc":co.get("description") or "","website":co.get("website") or "",
@@ -582,6 +587,7 @@ def assemble(rep, full=True, log=print):
             lead_tier = _tier_of(lead_vertical)
             lead_tier_label = catz.TIER_LABELS.get(str(lead_tier), "") if lead_tier else ""
             e["tier"] = e["tier"] or lead_tier or ""
+            e["vertical_name"] = catz.canon_vertical(lead_vertical) if lead_vertical else ""  # canonical display name (QA loop 2026-06-24)
             meta = lead_call.get(mid)
             disc_tx = tx_for_ai.get(meta["id"], "") if meta else ""
             if disc_tx:
