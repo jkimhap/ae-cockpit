@@ -466,6 +466,20 @@ def assemble(rep, full=True, log=print):
         _alerts(deal)
 
     deals = [d for d,_ in deals]
+    # Pipeline-hygiene post-pass: a company with >1 OPEN deal double-counts pipeline value and
+    # splits the deal history — a real data-quality fault. Detect-and-flag ONLY; merging/closing
+    # a deal is a live HubSpot write the AE owns, never the operator. (QA loop 2026-06-24 —
+    # Cotulla Education carried two open $75k Quote deals = $75k phantom pipeline.)
+    _open_co_counts = {}
+    for d in deals:
+        if d.get("is_open"):
+            _k = (d.get("company") or "").strip().lower()
+            _open_co_counts[_k] = _open_co_counts.get(_k, 0) + 1
+    for d in deals:
+        _k = (d.get("company") or "").strip().lower()
+        if d.get("is_open") and _open_co_counts.get(_k, 0) > 1:
+            d["alerts"].append({"sev":"high",
+                "text":f"Duplicate open deal — {_open_co_counts[_k]} open deals for {d['company']}; merge/close one in HubSpot"})
     # ---- upcoming + recently-held first calls ----
     up = []
     now_iso = _now().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -663,6 +677,11 @@ def _alerts(deal):
     if deal["is_open"] and len(deal["stakeholders"])<2: a.append({"sev":"med","text":f"Single-threaded — {len(deal['stakeholders'])} stakeholder"})
     if deal["is_open"] and not any(SENIOR.search(s.get("title") or "") for s in deal["stakeholders"]):
         a.append({"sev":"med","text":"No VP+ / decision-maker reached"})
+    # Pipeline-hygiene: a priced stage with no deal amount = a quote/pipeline value gap. Only
+    # fires at Quote/Verbal — at Discovery/Demo a null amount is expected (nothing priced until
+    # the formal quote, stage 04), so it must NOT alarm there (QA loop 2026-06-24).
+    if deal["is_open"] and deal["stage"] in ("Quote","Verbal") and not deal.get("amount"):
+        a.append({"sev":"high","text":f"No deal amount set at {deal['stage']} — pipeline value missing"})
     deal["alerts"]=a
 
 def _num(v):
