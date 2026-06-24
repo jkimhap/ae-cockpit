@@ -88,7 +88,11 @@ def assoc(from_obj, to_obj, ids):
 # ---- domain pulls ----
 DEAL_PROPS_BASE = ["dealname","dealstage","amount","pipeline","dealtype","createdate","closedate",
                    "hs_lastmodifieddate","hs_analytics_source","hs_analytics_source_data_1",
-                   "num_associated_contacts","description","hs_deal_stage_probability"]
+                   "num_associated_contacts","description","hs_deal_stage_probability",
+                   # Authoritative AE-selected loss reason (the source-of-record for Stage-07 §D DoD).
+                   # Without these the cockpit graded "loss logged" off the AI post-mortem (always
+                   # present) → a false all-clear. (QA loop 2026-06-24, check-3 / Stage-07.)
+                   "closed_lost_reason","disqualification_reason","closed_lost_notes"]
 
 def deals_for_owner(owner_id, stage_ids):
     props = DEAL_PROPS_BASE + [f"hs_v2_date_entered_{s}" for s in stage_ids]

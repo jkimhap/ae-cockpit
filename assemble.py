@@ -423,6 +423,14 @@ def assemble(rep, full=True, log=print):
                 "primary_contact":{"name":primary.get("name",""),"title":primary.get("title","")},
                 "stakeholders":stake,"calls":calls,"emails":elist,"timeline":tl,
                 "intel":"","loss":None,
+                # Authoritative AE-selected loss reason straight from HubSpot (source-of-record).
+                # `loss` (above) is the AI-derived post-mortem narrative and is ALWAYS produced for a
+                # closed-lost deal — so the Stage-07 §D "loss logged" DoD must grade off THIS field
+                # (the AE actually selected/accepted it), not off the AI guess. (QA loop check-3.)
+                "loss_logged":({"reason":p.get("closed_lost_reason") or "",
+                                "detail":p.get("disqualification_reason") or "",
+                                "notes":p.get("closed_lost_notes") or ""}
+                               if bucket=="closed_lost" else None),
                 "dcs":{"score":None,"color":"gray","scores":{},"rationale":"","days_in_stage":days_in_stage,
                        "baseline":BASELINE,"n_calls":len(calls),"n_emails":len(elist)},
                 "hubspot_url":f"https://app.hubspot.com/contacts/deals/{did}",

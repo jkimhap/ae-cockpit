@@ -1611,7 +1611,7 @@ const STAGE_STEPS={
     {k:'exec',lb:'Executed agreement returned + filed'}
   ]},
   lost:{next:null,steps:[
-    {k:'reason',col:'Loss context logged',lb:'Loss reason code + narrative logged',sub:'AE-accepted',auto:d=>!!d.loss},
+    {k:'reason',col:'Loss context logged',lb:'Loss reason code + narrative logged',sub:'AE-accepted',auto:d=>!!(d.loss_logged&&d.loss_logged.reason)},
     {k:'revival',col:'Revisited?',lb:'Revisited / revival watch',sub:'~2 months out unless killed-for-fit'}
   ]}
 };
@@ -1733,8 +1733,13 @@ function upsellDrop(d){
   return drop('upsell-'+d.id,'Upsell opportunity watch','',body,false);
 }
 function lossDrop(d){
-  const reason=d.loss?esc(String(d.loss)):'Not logged yet — capture why this died.';
-  const body=`<div class="blk"><div class="bh">Loss context</div><div class="who">${reason}</div></div>
+  // Authoritative AE-selected code from HubSpot first; AI post-mortem is supporting narrative, not the
+  // logged reason. (Was String(d.loss) → rendered "[object Object]" since d.loss is {reason,lessons}.)
+  const lg=d.loss_logged, ai=d.loss;
+  const logged=lg&&lg.reason?`<b>${esc(lg.reason)}</b>${lg.detail?` · ${esc(lg.detail)}`:''}`:'<i>Not logged in HubSpot yet — capture why this died.</i>';
+  const narrative=ai&&ai.reason?`<div class="blk"><div class="bh">Post-mortem (AI-derived — confirm vs the logged code)</div><div class="who">${esc(ai.reason)}</div></div>`:'';
+  const body=`<div class="blk"><div class="bh">Loss reason (HubSpot, AE-selected)</div><div class="who">${logged}</div></div>
+    ${narrative}
     <div class="blk"><div class="bh">Revival plan</div><ul>
     <li>Lost on timing/budget (not fit) → revisit in ~2 months</li>
     <li>Killed for fit (Tier-4 / no real field-worker training need) → close it for good, don't re-work it</li>
@@ -2160,7 +2165,11 @@ function dcsPanel(d){const sc=d.dcs.scores||{};const dims=[['pain','Pain'],['cha
   return `<div class="panel"><h3>Deal Confidence ${tag}<span class="ct">${d.dcs.score==null?'—':d.dcs.score}</span></h3>${bars?`<div class="bars">${bars}</div>`:'<div class="empty" style="padding:4px 0">No scored calls yet.</div>'}${alerts}${d.dcs.rationale?`<div class="rationale">${esc(d.dcs.rationale)}</div>`:''}</div>`;}
 function stakePanel(d){if(!d.stakeholders.length)return `<div class="panel" id="panel-stakeholders"><h3>Stakeholders <span class="ct">0</span></h3><div class="empty" style="padding:4px 0">No stakeholder on file — single-threaded. Add a 2nd contact / confirm routing.</div></div>`;const ps=d.stakeholders.map(s=>{const dm=/\b(vp|chief|coo|ceo|cfo|president|owner|founder|head|director|vice)\b/i.test(s.title||'');return `<div class="p ${dm?'dm':''}"><b>${esc(s.name)}</b>${s.title?` <span>· ${esc(s.title)}</span>`:''}</div>`;}).join('');
   return `<div class="panel" id="panel-stakeholders"><h3>Stakeholders <span class="ct">${d.stakeholders.length}</span></h3><div class="stk">${ps}</div></div>`;}
-function lossPanel(d){const l=d.loss;if(!l)return'';return `<div class="panel loss"><h3 style="color:var(--lost)">Loss post-mortem</h3>${l.reason?`<div style="font-size:13px;color:var(--muted);line-height:1.5"><b style="color:var(--lost)">Why:</b> ${esc(l.reason)}</div>`:''}${l.lessons?`<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-top:8px"><b style="color:var(--lost)">Lesson:</b> ${esc(l.lessons)}</div>`:''}</div>`;}
+function lossPanel(d){const l=d.loss, lg=d.loss_logged;if(!l&&!lg)return'';
+  // Logged code (AE-selected, source-of-record) sits ABOVE the AI post-mortem so the official reason is
+  // never hidden behind the AI narrative; the operator reconciles the two (SOP 07 §A). (QA loop check-3.)
+  const logged=lg?`<div style="font-size:13px;line-height:1.5"><b style="color:var(--lost)">Logged (HubSpot, AE-selected):</b> ${lg.reason?esc(lg.reason):'<i>none recorded</i>'}${lg.detail?` — ${esc(lg.detail)}`:''}${lg.notes?`<div style="color:var(--muted);margin-top:2px">${esc(lg.notes)}</div>`:''}</div>`:'';
+  return `<div class="panel loss"><h3 style="color:var(--lost)">Loss post-mortem</h3>${logged}${l&&l.reason?`<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-top:8px"><b style="color:var(--lost)">Why (AI — confirm vs logged):</b> ${esc(l.reason)}</div>`:''}${l&&l.lessons?`<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-top:8px"><b style="color:var(--lost)">Lesson:</b> ${esc(l.lessons)}</div>`:''}</div>`;}
 function activityPanel(d){const items=(d.timeline||[]).slice(0,40);const lbl={call:'Call',email:'Email',meeting:'Meeting',note:'Note',stage:'Stage'};
   const body=items.map(it=>{const btn=it.kind==='call'?` · <a class="lk" onclick="showCall('${d.id}','${it.ref}',event)">summary</a>`:'';
     return `<div class="it"><span class="ktag">${lbl[it.kind]||'—'}</span><div><div class="ti">${esc(it.title)}</div><div class="mt">${esc(it.sub||'')}${it.sub?' · ':''}${esc(fmtDate(it.ts))}${btn}</div></div></div>`;}).join('');
