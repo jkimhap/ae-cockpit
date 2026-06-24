@@ -713,6 +713,20 @@ def _alerts(deal):
     # same broken-deal_id / transcript-binding family as the dup-deal finding.)
     elif deal["is_open"] and deal.get("rubric_stage") in ("roi","prop") and (_bant.get("rec") is None or _bant.get("total") is None):
         a.append({"sev":"high","text":f"Advanced to {deal['stage']} but never qualified — no BANT on record (no call/transcript bound); bind the discovery call, or qualify/disqualify before advancing"})
+    # Forecast hygiene (time axis): an OPEN deal whose committed close date has already slipped into the
+    # past is a silently-lying forecast — the pipeline still reports it closing on a date that's gone, yet
+    # no one has re-set it. Sibling of the null-amount value-axis check above (both are forecast integrity,
+    # distinct from the qualification-bypass back-stops — additive, not a dup). is_open-gated (a closed
+    # deal's past closedate is normal). Severity scales with the distortion: a bigger mis-dated deal warps
+    # the forecast more, so >=$40k = high (reuses the SOP's >$40k materiality line), else med. A null or
+    # future closedate never fires (_days_since>0 only) — a Discovery deal with no committed date yet is
+    # expected, not flagged. (QA loop 2026-06-24 — Horizon Services $150k 19d past · Gila River $28k 27d
+    # past · Church of Jesus Christ $25k 22d past = the only 3 of 25 open deals that fire.)
+    _cd = (deal.get("closedate") or "")[:10]
+    _cd_age = _days_since(deal.get("closedate"))
+    if deal["is_open"] and _cd_age is not None and _cd_age > 0:
+        a.append({"sev":("high" if (deal.get("amount") or 0) >= 40000 else "med"),
+                  "text":f"Close date passed {_cd_age}d ago ({_cd}) — deal still open; re-set the forecast close date"})
     deal["alerts"]=a
 
 def _num(v):
