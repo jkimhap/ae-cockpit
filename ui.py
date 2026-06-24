@@ -894,6 +894,11 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
    Hover restores full strength so a past row is fully readable on interaction. */
 .stbl.bookedtbl tbody tr.past{opacity:.5}.stbl.bookedtbl tbody tr.past:hover{opacity:1}
 .stbl.bookedtbl tbody tr.awaiting td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+.stbl.bookedtbl tbody tr.resched td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+.stbl.bookedtbl tbody tr.cancld td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+.ocb{font-size:10px;font-weight:700;letter-spacing:.02em;margin-top:3px;display:inline-block;padding:1px 6px;border-radius:5px}
+.ocb.resched{background:var(--amber-bg);color:var(--amber)}
+.ocb.cancld{background:var(--red-bg);color:var(--red)}
 .awo{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:600;color:var(--amber);background:var(--amber-bg);padding:1px 7px;border-radius:10px;white-space:nowrap}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
@@ -1525,10 +1530,12 @@ function bookedTable(ms){
     const sw=esc(lmsOf(d));
     const emp=d.employees?esc(String(d.employees)):'—';
     const past=u.start&&new Date(u.start).getTime()<now;
-    const cls=u.awaiting_outcome?'awaiting':(past?'past':'');
+    const oc=(u.outcome||'').toUpperCase();
+    const cls=[u.awaiting_outcome?'awaiting':(past?'past':''),oc==='RESCHEDULED'?'resched':'',oc==='CANCELED'?'cancld':''].filter(Boolean).join(' ');
     const awo=u.awaiting_outcome?'<div class="awo" title="Meeting time passed but still marked Scheduled with no transcript — set the outcome (held / no-show / cancelled)">⏳ awaiting outcome</div>':'';
+    const ocb=oc==='RESCHEDULED'?'<div class="ocb resched" title="Prospect moved this call — the time shown is the latest/current slot. Confirm it\'s still on.">↻ Rescheduled</div>':oc==='CANCELED'?'<div class="ocb cancld" title="This call was cancelled — follow up to re-book.">✕ Cancelled</div>':'';
     const gc=BOOKED_COLS.map(([k])=>{const st=bookedStepByK(k);const dn=st&&stepDone(d,st);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
-    return `<tr class="${cls}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div>${awo}</td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td class="num">${past?bantTag(d):'—'}</td><td>${contact}</td>${gc}</tr>`;
+    return `<tr class="${cls}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div>${ocb}${awo}</td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td class="num">${past?bantTag(d):'—'}</td><td>${contact}</td>${gc}</tr>`;
   }).join('')||`<tr><td colspan="${9+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl bookedtbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -1628,7 +1635,7 @@ function hasCall(d){
   // meeting COMPLETED or we actually scored a discovery transcript for it. (Johnny 2026-06-23)
   if(d.synthetic_booked)return d.meeting_outcome==='COMPLETED'||!!(d.bant&&d.bant.total!=null);
   return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
-function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id)||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
+function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id&&(u.outcome||'').toUpperCase()!=='CANCELED')||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
 function hasOutEmail(d){const dd=discoveryDate(d);const t0=dd?new Date(dd).getTime():0;return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||'')&&(!t0||(e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>=t0-3600000)));}
 function stepDone(d,st){const ov=(dst(d.id).steps||{})[st.k];if(ov===true||ov===false)return ov;return st.auto?!!st.auto(d):false;}
 function toggleStep(id,k,eff){const s=dst(id);s.steps=s.steps||{};s.steps[k]=!eff;save(id,s);renderDeal(id);}

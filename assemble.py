@@ -554,10 +554,16 @@ def assemble(rep, full=True, log=print):
         start = mp.get("hs_meeting_start_time") or ""
         outcome = (mp.get("hs_meeting_outcome") or "").upper()
         is_future = start > now_iso          # ISO-Zulu strings compare lexically
-        # A CANCELED or RESCHEDULED slot is not a live booked call (a rescheduled meeting
-        # re-appears as its own new meeting object). Drop the dead slot so it neither shows in
-        # Discovery Booked nor falsely reads as a held call. (Johnny 2026-06-23)
-        if outcome in ("CANCELED", "RESCHEDULED"):
+        # A CANCELED/RESCHEDULED slot whose start is in the PAST is a dead/superseded slot — drop
+        # it so it neither lingers in Discovery Booked nor falsely reads as a held call
+        # (Johnny 2026-06-23, ServiceMaster). BUT a CANCELED/RESCHEDULED call still in the FUTURE
+        # is live & actionable and must NOT be dropped: a public-link reschedule updates the SAME
+        # meeting object's start_time to the new slot and tags it RESCHEDULED (HubSpot does NOT
+        # create a separate new object), so the future-dated row IS the real upcoming call. Keep
+        # it — `outcome` rides along on the row (set below) so Discovery Booked can badge it
+        # Rescheduled/Cancelled. (Johnny 2026-06-24: Severn Group 11:30 ET + SVM 12 ET were both
+        # owned by Grant, First Meeting, future-dated, RESCHEDULED — and silently dropped here.)
+        if outcome in ("CANCELED", "RESCHEDULED") and not is_future:
             continue
         # Keep genuine first-calls with no deal (Discovery Booked, even if just held) and any
         # future meeting; drop *past* deal-linked meetings — they belong to the deal's history,
