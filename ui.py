@@ -1278,7 +1278,7 @@ function bookedDeal(id){
     hubspot_url:'',timeline:[],ai_fields:{},dcs:null,loss:null,closedate:'',
     bant:u.bant||null,enrich:u.enrich||null,inbound:(typeof u.inbound==='boolean'?u.inbound:null),
     tier:(u.tier!=null?u.tier:null),tier_label:u.bant_tier||'',
-    meeting_start:u.start,num_of_learners:u.num_of_learners||'',lms:u.lms||''};
+    meeting_start:u.start,meeting_outcome:u.outcome||'',num_of_learners:u.num_of_learners||'',lms:u.lms||''};
 }
 const fmtDate=s=>{if(!s)return '';const d=new Date(s);return isNaN(d)?String(s).slice(0,10):d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
 const fmtDT=s=>{const d=new Date(s);return isNaN(d)?s:d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});};
@@ -1611,9 +1611,10 @@ function stepStage(d){
   return ({'1090549665':'disc_complete','1090549667':'demo','1104822108':'quote','1329839734':'verbal','1090549670':'won','1090549671':'lost'})[String(d.stage_id)]||'disc_complete';
 }
 function hasCall(d){
-  // Synthetic Booked row has no timeline/Gong yet; a first-call whose slot has passed is
-  // treated as held (AE can uncheck a no-show). Real deals use timeline + DCS call count.
-  if(d.synthetic_booked)return !!(d.meeting_start&&new Date(d.meeting_start).getTime()<Date.now());
+  // Synthetic Booked row has no timeline/Gong; a passed slot does NOT mean the call happened
+  // (it may be a no-show / pending disposition). Only count it held when HubSpot marks the
+  // meeting COMPLETED or we actually scored a discovery transcript for it. (Johnny 2026-06-23)
+  if(d.synthetic_booked)return d.meeting_outcome==='COMPLETED'||!!(d.bant&&d.bant.total!=null);
   return (d.timeline||[]).some(e=>e.kind==='call')||!!(d.dcs&&d.dcs.n_calls>0);}
 function hasFutureMeeting(d){const now=Date.now();return (D.upcoming||[]).some(u=>u.deal_id===d.id)||(d.timeline||[]).some(e=>e.kind==='meeting'&&e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>now);}
 function hasOutEmail(d){const dd=discoveryDate(d);const t0=dd?new Date(dd).getTime():0;return (d.timeline||[]).some(e=>e.kind==='email'&&/out/i.test(e.sub||'')&&(!t0||(e.ts&&e.ts!=='0'&&new Date(e.ts).getTime()>=t0-3600000)));}

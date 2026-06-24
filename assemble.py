@@ -513,14 +513,20 @@ def assemble(rep, full=True, log=print):
             did = open_by_co.get(tl) or next((i for co, i in open_by_co.items() if co and co in tl), None)
         is_first = (mp.get("hs_activity_type") == "First Meeting")
         start = mp.get("hs_meeting_start_time") or ""
+        outcome = (mp.get("hs_meeting_outcome") or "").upper()
         is_future = start > now_iso          # ISO-Zulu strings compare lexically
+        # A CANCELED or RESCHEDULED slot is not a live booked call (a rescheduled meeting
+        # re-appears as its own new meeting object). Drop the dead slot so it neither shows in
+        # Discovery Booked nor falsely reads as a held call. (Johnny 2026-06-23)
+        if outcome in ("CANCELED", "RESCHEDULED"):
+            continue
         # Keep genuine first-calls with no deal (Discovery Booked, even if just held) and any
         # future meeting; drop *past* deal-linked meetings — they belong to the deal's history,
         # and keeping them would wrongly satisfy hasFutureMeeting() / pollute the agenda.
         if not ((is_first and not did) or is_future):
             continue
         e = {"title":title,"start":start,
-             "meeting_id":mid,"is_first":bool(is_first),
+             "meeting_id":mid,"is_first":bool(is_first),"outcome":outcome,
              "contact":"","contact_title":"","company":(by_id[did]["company"] if did in by_id else _clean_mtg_title(title)),
              "employees":"","num_of_learners":"","lms":"","which_lms":"","fw_est":"",
              "vertical_quinn":"","vertical":"","vertical_meta":{},"tier":"",
