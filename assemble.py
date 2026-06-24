@@ -693,6 +693,18 @@ def _alerts(deal):
     if deal["is_open"] and deal.get("rubric_stage") in ("roi","prop") and _bant.get("rec") == "DISQUALIFY":
         _why = _bant.get("rec_reason") or f"BANT {_bant.get('total')}"
         a.append({"sev":"high","text":f"Advanced to {deal['stage']} but qualification = DISQUALIFY ({_why}) — disqualify, or document why it's still live"})
+    # Unscored-past-gate (sibling of the DISQUALIFY back-stop above): advanced PAST the qualify gate but
+    # NEVER scored at all — bant is null / rec / total is None — because no call/transcript is bound, so
+    # the rubric never executed. The gate did not merely FAIL here, it never RAN, yet the deal moved to
+    # Demo+/Proposal anyway. The cockpit otherwise shows a BLANK BANT panel, which reads as "nothing to
+    # see" rather than the truth: never qualified. Detect-and-flag only — binding the missing discovery
+    # call or disqualifying is the AE's live action. Discovery-stage deals with no score are EXPECTED
+    # (call not yet held) and are NOT flagged. A null verdict is NOT a failing verdict — never render it
+    # as DISQUALIFY; it's a coverage gap. (QA loop 2026-06-24 — Cotulla Education x2 at Quote, $75k each,
+    # calls=0 / deal_id=None: a $150k slice of pipeline past the gate with zero qualification on record;
+    # same broken-deal_id / transcript-binding family as the dup-deal finding.)
+    elif deal["is_open"] and deal.get("rubric_stage") in ("roi","prop") and (_bant.get("rec") is None or _bant.get("total") is None):
+        a.append({"sev":"high","text":f"Advanced to {deal['stage']} but never qualified — no BANT on record (no call/transcript bound); bind the discovery call, or qualify/disqualify before advancing"})
     deal["alerts"]=a
 
 def _num(v):
