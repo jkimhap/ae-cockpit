@@ -30,6 +30,53 @@ def _icp():
 TIERS, TIER_LABELS = _icp()
 VERTICALS = list(TIERS.keys())
 
+# HubSpot's "Industry (Quinn)" contact property (industry_category) stores snake_case
+# option SLUGS (e.g. "hvac_service_provider"), not the canonical ICP vertical names that
+# are the keys of TIERS (e.g. "HVAC Service Provider"). A raw TIERS.get(slug) misses ->
+# tier=None -> the fit/qualify routing silently breaks (a T4 don't-sell can fall through
+# to QUALIFY; a T1 loses its auto-pass). This map is the single source of truth that
+# translates each slug to its canonical TIERS key. Mirror of the HubSpot property options.
+SLUG_TO_VERTICAL = {
+    "auto_repair__service": "Auto Repair & Service",
+    "automation__controls": "Automation & Controls",
+    "biomedical_equipment_service": "Biomedical Equipment Service",
+    "car_wash": "Car Wash",
+    "residential_cleaning": "Janitorial & Cleaning",
+    "commercial_kitchen_equipment_service": "Commercial Kitchen Equipment",
+    "distribution__wholesale": "Manufacturers & Distributors",
+    "electrical_services": "Electrical",
+    "hvac__energy_services": "Energy with HVAC Team",
+    "facilities_maintenance": "Facilities Maintenance",
+    "fire_protection_low_voltage__security": "Fire, Low Voltage & Security",
+    "general_construction": "General & Residential Construction",
+    "hvac_service_provider": "HVAC Service Provider",
+    "industry_association": "Industry Associations",
+    "landscaping_lawn__irrigation": "Landscaping, Lawn & Irrigation",
+    "manufacturing__industrial": "Manufacturers & Distributors",
+    "mechanical_construction": "Mechanical Construction",
+    "pest_control": "Pest Control",
+    "plumbing": "Plumbing",
+    "refrigeration": "Refrigeration",
+    "restaurants__hospitality": "Hospitality & Amusement",
+    "restoration": "Restoration",
+    "roofing__exteriors": "Roofing",
+    "trade_school": "Trade Schools",
+    "waste__recycling": "Waste & Recycling",
+    "water_treatment_pool_service": "Water Treatment & Pool",
+    # "other"/"unknown" intentionally omitted -> treated as empty by callers.
+}
+
+def canon_vertical(v):
+    """Normalize a vertical to a canonical TIERS key. Accepts either a HubSpot
+    'Industry (Quinn)' option slug (snake_case) or an already-canonical vertical name.
+    Returns the canonical key when known, else the input unchanged (unknowns stay honest)."""
+    if not v:
+        return v
+    s = str(v).strip()
+    if s in TIERS:
+        return s
+    return SLUG_TO_VERTICAL.get(s, s)
+
 # ---------------------------------------------------------------- scraping
 _SUBPAGES = ["", "about", "about-us", "services", "what-we-do", "company", "solutions", "industries"]
 

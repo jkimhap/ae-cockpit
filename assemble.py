@@ -69,9 +69,12 @@ def _inbound(cp):
     return None
 
 def _tier_of(vertical):
-    """Vertical name -> ICP tier number (1-4) via the live icp-tiers map; None if unmatched."""
+    """Vertical name -> ICP tier number (1-4) via the live icp-tiers map; None if unmatched.
+    Normalizes a HubSpot 'Industry (Quinn)' option slug (e.g. 'hvac_service_provider')
+    to its canonical TIERS key first, so a contact-sourced vertical tiers correctly
+    instead of silently returning None and corrupting the fit/qualify routing."""
     if not vertical: return None
-    return catz.TIERS.get(vertical) or catz.TIERS.get(str(vertical).strip())
+    return catz.TIERS.get(catz.canon_vertical(vertical))
 
 def _fit(tier, fw, emp, inbound, lms_has):
     """Quinn-fit auto-check (Johnny 2026-06-23, locked ts1782249132):

@@ -1469,13 +1469,18 @@ function stageCols(sk){return ((STAGE_STEPS[sk]||{}).steps||[]).filter(s=>s.col)
    refines these every time she analyzes a new call; fall back to the booking-form band. */
 function fwOf(d){
   if(d.bant&&d.bant.field_workers!=null)return String(d.bant.field_workers);
+  const en=d.enrich||{};
+  if(en.fw_band&&String(en.fw_band).trim())return String(en.fw_band).trim();   // booking-form band
+  if(en.fw_est!=null&&en.fw_est!=='')return String(en.fw_est);
   if(d.num_of_learners)return String(d.num_of_learners);
   return '—';
 }
 function lmsOf(d){
   const b=d.bant&&d.bant.lms_has;
   if(b==='yes')return 'Yes'; if(b==='no')return 'No';
-  if(d.lms&&String(d.lms).trim()){const v=String(d.lms).trim().toLowerCase();return (v==='no'||v==='none'||v==='n'||v==='false')?'No':'Yes';}
+  const en=d.enrich||{};
+  const src=(en.lms!=null&&en.lms!=='')?en.lms:d.lms;
+  if(src&&String(src).trim()){const v=String(src).trim().toLowerCase();return (v==='no'||v==='none'||v==='n'||v==='false')?'No':'Yes';}
   return '—';
 }
 function bantTag(d){const b=d.bant;if(!b||b.total==null)return '—';const t=b.total;const col=t>=50?'var(--won)':'var(--lost)';return `<b style="color:${col};font-variant-numeric:tabular-nums">${t}</b>`;}
