@@ -95,7 +95,16 @@ def _fit(tier, fw, emp, inbound, lms_has):
         if size_ok: return True, f"T{tier} inbound, size OK (FW {fw or '?'} / emp {emp or '?'} vs FW≥{bar_fw} or emp≥{bar_emp})"
         if fw is None and emp is None: return None, f"T{tier} inbound — size unknown, confirm on the call"
         return False, f"T{tier} inbound but below size bar (need FW≥{bar_fw} or emp≥{bar_emp})"
-    if tier is None and fw is None and emp is None: return None, "Vertical & size unknown — confirm on the call"
+    if tier is None:
+        # No vertical resolved to a Quinn tier — either no industry signal at all,
+        # or the website categorizer high-confidence returned "not a Quinn vertical"
+        # (e.g. a church). Size alone never establishes ICP membership, so NEVER
+        # auto-pass: surface as unscored and make the AE classify on the call.
+        # (QA loop 2026-06-24: the old catch-all returned True/"Meets fit floor"
+        # whenever any size signal existed, silently passing out-of-ICP accounts.)
+        if fw is None and emp is None:
+            return None, "Vertical & size unknown — confirm on the call"
+        return None, "Quinn-fit unverified — vertical not resolved; classify on the call"
     return True, "Meets fit floor"
 
 def _recommend(total, floors_ok, floor_fail, tier, fw, emp, inbound, lms_has):
