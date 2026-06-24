@@ -531,7 +531,7 @@ def assemble(rep, full=True, log=print):
              "employees":"","num_of_learners":"","lms":"","which_lms":"","fw_est":"",
              "vertical_quinn":"","vertical":"","vertical_meta":{},"tier":"",
              "bant":None,"enrich":None,"inbound":None,"bant_tier":"",
-             "deal_id":did}
+             "deal_id":did,"awaiting_outcome":False}
         if is_first and not did:
             cids = m2contact.get(mid, []); coids = m2company.get(mid, [])
             cp = f_contacts.get(cids[0], {}) if cids else {}
@@ -581,6 +581,13 @@ def assemble(rep, full=True, log=print):
                 except Exception as ex:
                     log(f"BANT scoring failed for lead {mid}: {ex}"); e["bant"] = None
             e["bant_tier"] = (e["bant"] or {}).get("tier","") or lead_tier_label
+            # "Awaiting outcome" ghost: the first meeting's start time has passed but it was never
+            # marked (still SCHEDULED/blank) and produced no transcript → no BANT. It sits in
+            # Discovery Booked looking live when the call may have no-showed or quietly slipped.
+            # Surface it so the AE sets an outcome instead of it hiding. (Johnny 2026-06-23)
+            e["awaiting_outcome"] = bool(start and not is_future
+                                         and outcome in ("", "SCHEDULED")
+                                         and e["bant"] is None)
         up.append(e)
     up.sort(key=lambda x: x["start"])
     up = up[:200]   # one rep's meetings; raised from 30 so the 60-day booked look-back isn't truncated

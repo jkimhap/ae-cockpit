@@ -893,6 +893,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--ink)}
 /* Past discovery calls (already happened, still in Booked) recede; future calls stay normal.
    Hover restores full strength so a past row is fully readable on interaction. */
 .stbl.bookedtbl tbody tr.past{opacity:.5}.stbl.bookedtbl tbody tr.past:hover{opacity:1}
+.stbl.bookedtbl tbody tr.awaiting td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+.awo{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:600;color:var(--amber);background:var(--amber-bg);padding:1px 7px;border-radius:10px;white-space:nowrap}
 .tier{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .tier.t1{color:#fff;background:#15a34a}.tier.t2{color:#fff;background:#86a31a}.tier.t3{color:#fff;background:#d08327}.tier.t4{color:#fff;background:#bb2d22}.tier.tx{color:var(--faint);background:transparent;border:1px dashed var(--line)}
 .tier.inf{opacity:.92;box-shadow:inset 0 -2px 0 rgba(255,255,255,.45)}
@@ -1515,8 +1517,10 @@ function bookedTable(ms){
     const sw=esc(lmsOf(d));
     const emp=d.employees?esc(String(d.employees)):'—';
     const past=u.start&&new Date(u.start).getTime()<now;
+    const cls=u.awaiting_outcome?'awaiting':(past?'past':'');
+    const awo=u.awaiting_outcome?'<div class="awo" title="Meeting time passed but still marked Scheduled with no transcript — set the outcome (held / no-show / cancelled)">⏳ awaiting outcome</div>':'';
     const gc=BOOKED_COLS.map(([k])=>{const st=bookedStepByK(k);const dn=st&&stepDone(d,st);return `<td class="gc">${dn?'<span class="gy">✓</span>':'<span class="gn">—</span>'}</td>`;}).join('');
-    return `<tr class="${past?'past':''}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div></td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td class="num">${past?bantTag(d):'—'}</td><td>${contact}</td>${gc}</tr>`;
+    return `<tr class="${cls}" onclick="location.hash='#/deal/${d.id}'"><td class="num">${esc(fmtDT(u.start))}</td><td><div class="co">${esc(d.company)}</div>${awo}</td><td>${tierTag(d)}</td><td>${esc(dealVertical(d))}</td><td class="num">${lw}</td><td>${sw}</td><td class="num">${emp}</td><td class="num">${past?bantTag(d):'—'}</td><td>${contact}</td>${gc}</tr>`;
   }).join('')||`<tr><td colspan="${9+BOOKED_COLS.length}"><div class="empty" style="border:none">No discovery calls booked.</div></td></tr>`;
   return `<div class="tblwrap"><table class="stbl bookedtbl"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
