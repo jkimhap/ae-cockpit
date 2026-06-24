@@ -135,25 +135,38 @@ Call deal_intelligence with:
 # ================================================================= BANT (SOP §2 rubric)
 # Lead-scoped BANT, computed from the Gong discovery transcript using the SalesOS SOP's
 # OWN rubric — NOT the outdated #gong-notifier n8n algorithm (which we override/sunset).
-# Rubric text is verbatim from quinn-sales-os-experiment/sop/gates.md §2 (v0.4); that SOP
+# Rubric text is verbatim from quinn-sales-os-experiment/sop/gates.md §2 (v0.5); that SOP
 # is the single source of truth — keep this constant in sync when the SOP rubric changes.
-BANT_RUBRIC_VERSION = "sop-gates-v0.4"
+# v0.5 (2026-06-23, Johnny): relaxed Budget/Authority/Timeline bands so a genuinely engaged
+# prospect earns 10 by default (Need unchanged); scored at temperature 0 for determinism.
+# Gate floors are UNCHANGED at B>=10 / A>=10 / N>=20 / T>=10, total>=50 (assemble.py _recommend).
+BANT_RUBRIC_VERSION = "sop-gates-v0.5"
 BANT_RUBRIC = """\
 BANT SCORING RUBRIC — score ONLY from the transcript evidence. Each component cites a verbatim quote.
+Scoring philosophy: a genuinely ENGAGED prospect (leaning in, exploring seriously, not stonewalling)
+should land a 10 on Budget/Authority/Timeline by default. Reserve 15-20 for explicit strong signals;
+reserve 5 for weak/no engagement; 0 for explicit rejection. Absence of an explicit budget number,
+formal title authority, or a fixed date is NOT a downgrade when the prospect is clearly engaged.
 
 BUDGET — x/20
-  20 real money allocated and sized for this need · 15 money is solvable, clear willingness to find/redirect ·
-  10 no budget but a credible path to secure it · 5 price-sensitive but exploring (pushback, door not closed) ·
-  0 hard rejection.
+  20 real money explicitly allocated and sized for this need.
+  15 budget is solvable — clear willingness to find/redirect funds, OR a strong-fit account where spend
+     of this size is routine.
+  10 engaged with NO budget objection raised and a plausible path to fund — INCLUDING when they simply
+     don't volunteer a number (buyers often withhold budget as a negotiation posture; treat "not disclosed"
+     as neutral, not negative). This is the default for a genuinely engaged prospect.
+  5 explicit price sensitivity / cost named as a real blocker, but the door isn't closed.
+  0 hard rejection — no money and no path, or explicitly can't/won't spend.
 
-AUTHORITY — x/20  (must be operationally-rooted to reach 20; HR/CHRO/CLO/training-only roles cap at 15)
-  20 economic buyer with full signing authority AND ready to decide solo (could say yes next call). Must be
-     ops-rooted (CEO/COO/Owner/VP Ops/GM).
-  15 one of: (a) clearly-interested ops-rooted buyer with signing authority but needs team consensus;
-     (b) strong external operational champion with a named decision-maker + scheduled engagement;
-     (c) strong HR/Training champion orchestrating cross-functionally (this is the ceiling for HR/Training).
-  10 real champion in evaluation; named decision-maker, escalation step discussed but not active ·
-  5 engaged participant without ownership; vague deflection, no named DM · 0 no decision-making structure visible.
+AUTHORITY — x/20
+  20 ops-rooted economic buyer (CEO/COO/Owner/VP Ops/GM) with signing authority who can move to yes.
+  15 ops-rooted buyer who needs team consensus; OR a strong, actively-driving champion of ANY function
+     (incl HR/Training/L&D) with a named decision-maker and a real path to them.
+  10 engaged prospect who is NOT the decision-maker but is clearly willing to bring us in / connect us to
+     the decision-maker, OR a real champion in evaluation. Lack of personal signing authority is NOT a
+     downgrade when there's a willing path upward. Default for an engaged non-DM contact.
+  5 engaged participant with no ownership and no path to a decision-maker.
+  0 wrong audience / no decision-making structure visible.
 
 NEED — x/40 = Operational Pain (x/20) + Tech Stack (x/10) + Multi-Location (x/5) + Compliance (x/5)
   Operational Pain (x/20):
@@ -173,9 +186,13 @@ NEED — x/40 = Operational Pain (x/20) + Tech Stack (x/10) + Multi-Location (x/
     compliance/cert described as a pain · 0 not mentioned.
 
 TIMELINE — x/20
-  20 active buying now (~1mo), specific urgency event (audit/launch/deadline) · 15 near-term (~2mo), specific
-  trigger or confident window · 10 named window, no specific trigger ("this summer","Q3") · 5 vague intent
-  ("sometime this year") · 0 pure fact-finding.
+  20 active buying now (~1mo) with a specific urgency event (audit/launch/deadline/contract end).
+  15 near-term (~2-3mo) named window OR clear need-driven intent to move once value is demonstrated.
+  10 no official timeline but genuine intent — "we'll move if the need/ROI is there," actively evaluating
+     without a fixed date. Absence of a stated date is NOT a downgrade when intent is real. Default for an
+     engaged prospect.
+  5 vague/exploratory ("sometime", "just looking"), no real intent yet.
+  0 pure fact-finding, explicitly no intent to buy.
 
 ALSO EXTRACT (for fit + funnel columns):
   field_workers: the number of FIELD workers they would be looking to TRAIN in the context of THIS buying
@@ -244,7 +261,7 @@ TRANSCRIPT:
 
 Call bant_score with every component scored."""
     try:
-        msg = client().messages.create(model=MODEL, max_tokens=3500,
+        msg = client().messages.create(model=MODEL, max_tokens=3500, temperature=0,
             tools=[BANT_TOOL], tool_choice={"type":"tool","name":"bant_score"},
             messages=[{"role":"user","content":prompt}])
         result = {}
